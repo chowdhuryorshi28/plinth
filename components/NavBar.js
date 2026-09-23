@@ -11,6 +11,7 @@ export default function NavBar() {
   const [user, setUser] = useState(null);   // the Supabase auth user (or null)
   const [profile, setProfile] = useState(null); // our own "profiles" row for that user
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     // Ask Supabase "who is logged in right now?" once on load...
@@ -26,6 +27,21 @@ export default function NavBar() {
     if (!user) { setProfile(null); return; }
     supabase.from("profiles").select("*").eq("id", user.id).single()
       .then(({ data }) => setProfile(data || null));
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) { setUnreadCount(0); return; }
+    const checkUnread = () => {
+      supabase
+        .from("messages")
+        .select("id", { count: "exact", head: true })
+        .is("read_at", null)
+        .neq("sender_id", user.id)
+        .then(({ count }) => setUnreadCount(count || 0));
+    };
+    checkUnread();
+    const interval = setInterval(checkUnread, 8000);
+    return () => clearInterval(interval);
   }, [user]);
 
   const logout = async () => {
@@ -48,7 +64,15 @@ export default function NavBar() {
           {user ? (
             <>
               <PrimaryButton onClick={() => router.push("/post")}><IconPlus size={15} /> Post a Project</PrimaryButton>
-              <Link href="/dashboard" className="text-[14px] text-inksoft hover:text-ink">Dashboard</Link>
+                                        <Link href="/dashboard" className="text-[14px] text-inksoft hover:text-ink">Dashboard</Link>
+              <Link href="/messages" className="relative text-[14px] text-inksoft hover:text-ink">
+                Messages
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1.5 -right-2.5 bg-accent text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
+              </Link>
               <Link href="/profile">
                 <Avatar tag={profile ? initials(profile.display_name) : "?"} size={36} />
               </Link>
@@ -74,6 +98,7 @@ export default function NavBar() {
             <>
               <Link href="/post" onClick={() => setMobileOpen(false)}>Post a Project</Link>
               <Link href="/dashboard" onClick={() => setMobileOpen(false)}>Dashboard</Link>
+              <Link href="/messages" onClick={() => setMobileOpen(false)}>Messages</Link>
               <Link href="/profile" onClick={() => setMobileOpen(false)}>Profile</Link>
               <button onClick={logout} className="text-left text-inksoft">Log out</button>
             </>

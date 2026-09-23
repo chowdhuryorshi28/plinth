@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "../../../lib/supabase/client";
 import { Avatar, Pill, money, initials, IconArrowLeft, IconCheck } from "../../../components/ui";
+import { createClient } from "../../../lib/supabase/client";
 
 export default function ProjectDetailPage() {
   const { id } = useParams();
@@ -88,7 +89,53 @@ export default function ProjectDetailPage() {
             )}
           </div>
         </aside>
+           </div>
+
+      <div className="mt-10">
+        <MessageButton project={p} router={router} supabase={supabase} />
       </div>
     </div>
+  );
+}
+
+function MessageButton({ project, router, supabase }) {
+  const [user, setUser] = useState(undefined);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUser(data?.user || null));
+  }, []);
+
+  if (user === undefined) return null;
+  if (!user) return <div className="text-[13.5px] text-inksoft">Log in to message about this project.</div>;
+
+  const isOwner = user.id === project.owner_id;
+
+  async function openChat() {
+    if (isOwner) {
+      router.push("/messages");
+      return;
+    }
+    const { data: existing } = await supabase
+      .from("threads")
+      .select("id")
+      .eq("project_id", project.id)
+      .eq("helper_id", user.id)
+      .maybeSingle();
+    if (existing) {
+      router.push(`/messages/${existing.id}`);
+      return;
+    }
+    const { data } = await supabase
+      .from("threads")
+      .insert({ project_id: project.id, owner_id: project.owner_id, helper_id: user.id })
+      .select()
+      .single();
+    router.push(`/messages/${data.id}`);
+  }
+
+  return (
+    <button onClick={openChat} className="btn-press bg-ink text-paper hover:bg-accent font-medium text-[14px] px-5 py-2.5 rounded-[4px]">
+      {isOwner ? "View Messages" : "Offer to Help"}
+    </button>
   );
 }
