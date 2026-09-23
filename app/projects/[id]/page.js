@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "../../../lib/supabase/client";
 import { Avatar, Pill, money, initials, IconArrowLeft, IconCheck } from "../../../components/ui";
-import { createClient } from "../../../lib/supabase/client";
+
 
 export default function ProjectDetailPage() {
   const { id } = useParams();
