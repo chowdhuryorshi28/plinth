@@ -12,9 +12,9 @@ export default function PostProjectPage() {
     title: "", category: "3D Rendering", description: "",
     tasks: "", software: "", deadline: "", hours: "", budget: "",
   });
-  const [posting, setPosting] = useState(false);
+   const [posting, setPosting] = useState(false);
   const [error, setError] = useState("");
-
+  const [files, setFiles] = useState([]);
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUser(data.user || null));
   }, []);
@@ -40,8 +40,24 @@ export default function PostProjectPage() {
       budget: Number(form.budget) || 0,
     }).select().single();
 
+    if (error) { setPosting(false); setError(error.message); return; }
+
+    // upload any attached files, then record them in project_files
+    for (const file of files) {
+      const path = `${data.id}/${Date.now()}-${file.name}`;
+      const { error: uploadError } = await supabase.storage.from("project-files").upload(path, file);
+      if (!uploadError) {
+        await supabase.from("project_files").insert({
+          project_id: data.id,
+          file_name: file.name,
+          file_path: path,
+          file_type: file.type,
+          uploaded_by: user.id,
+        });
+      }
+    }
+
     setPosting(false);
-    if (error) { setError(error.message); return; }
     router.push(`/projects/${data.id}`);
   };
 
@@ -106,6 +122,19 @@ export default function PostProjectPage() {
           <label className="text-[12.5px] text-inksoft mb-1.5 block">Budget (৳)</label>
           <input type="number" value={form.budget} onChange={set("budget")} placeholder="e.g. 2500"
             className="w-full h-11 px-4 rounded-[4px] border border-line text-[14px] text-ink" />
+        </div>
+
+        <div>
+          <label className="text-[12.5px] text-inksoft mb-1.5 block">Project files (optional)</label>
+          <input
+            type="file"
+            multiple
+            onChange={(e) => setFiles(Array.from(e.target.files || []))}
+            className="w-full text-[13.5px] text-ink file:mr-3 file:py-2 file:px-3 file:rounded-[4px] file:border file:border-line file:bg-paperdim file:text-ink file:text-[13px]"
+          />
+          {files.length > 0 && (
+            <p className="text-[12px] text-inksoft mt-1.5">{files.length} file(s) selected</p>
+          )}
         </div>
 
         {error && <p className="text-[13px] text-red-600">{error}</p>}

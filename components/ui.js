@@ -87,6 +87,19 @@ export const IconArrowLeft = (p) => <Icon {...p}><path d="M19 12H5" /><path d="M
 export const IconArrowRight = (p) => <Icon {...p}><path d="M5 12h14" /><path d="M13 6l6 6-6 6" /></Icon>;
 export const IconPlus = (p) => <Icon {...p}><path d="M12 5v14" /><path d="M5 12h14" /></Icon>;
 export const IconCheck = (p) => <Icon {...p}><path d="M20 6 9 17l-5-5" /></Icon>;
+export const StatusBadge = ({ status }) => {
+  const map = {
+    open: { label: "Open", cls: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" },
+    in_progress: { label: "In Progress", cls: "bg-amber-500/10 text-amber-600 border-amber-500/20" },
+    completed: { label: "Completed", cls: "bg-inksoft/10 text-inksoft border-inksoft/20" },
+  };
+  const s = map[status] || map.open;
+  return (
+    <span className={`text-[10.5px] font-medium px-2 py-0.5 rounded-full border ${s.cls}`}>
+      {s.label}
+    </span>
+  );
+};
 export const IconBriefcase = (p) => <Icon {...p}><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" /></Icon>;
 export const IconStar = (p) => <Icon {...p}><path d="M12 3.5l2.6 5.6 6 .7-4.4 4.1 1.2 6-5.4-3-5.4 3 1.2-6L3.4 9.8l6-.7L12 3.5Z" /></Icon>;
 export const IconDot = (p) => <Icon {...p}><circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none" /></Icon>;

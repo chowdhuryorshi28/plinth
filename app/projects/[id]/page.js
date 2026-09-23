@@ -2,14 +2,14 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "../../../lib/supabase/client";
-import { Avatar, Pill, money, initials, IconArrowLeft, IconCheck } from "../../../components/ui";
-
+import { Avatar, Pill, money, initials, IconArrowLeft, IconCheck, StatusBadge } from "../../../components/ui";
 
 export default function ProjectDetailPage() {
   const { id } = useParams();
   const router = useRouter();
   const supabase = createClient();
   const [p, setP] = useState(undefined);
+  const [files, setFiles] = useState([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -17,6 +17,11 @@ export default function ProjectDetailPage() {
       .eq("id", id).single()
       .then(({ data }) => { if (!cancelled) setP(data || null); });
     return () => { cancelled = true; };
+  }, [id]);
+
+  useEffect(() => {
+    supabase.from("project_files").select("*").eq("project_id", id)
+      .then(({ data }) => setFiles(data || []));
   }, [id]);
 
   if (p === undefined) return <div className="max-w-3xl mx-auto px-5 py-16 text-inksoft">Loading…</div>;
@@ -30,7 +35,10 @@ export default function ProjectDetailPage() {
         <IconArrowLeft size={15} /> Back to projects
       </button>
 
-      <Pill className="mb-4">{p.category}</Pill>
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+        <Pill>{p.category}</Pill>
+        <StatusBadge status={p.status} />
+      </div>
       <h1 className="font-display font-extrabold text-[28px] md:text-[34px] text-ink leading-tight max-w-2xl">{p.title}</h1>
       <div className="flex items-center gap-3 mt-4 mb-10">
         <Avatar tag={initials(ownerName)} size={30} />
@@ -56,6 +64,35 @@ export default function ProjectDetailPage() {
                   </li>
                 ))}
               </ul>
+            </div>
+          )}
+          {files.length > 0 && (
+            <div>
+              <h2 className="font-display font-bold text-[15px] text-ink mb-3">Project files</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {files.map((f) => {
+                  const { data } = supabase.storage.from("project-files").getPublicUrl(f.file_path);
+                  return (
+                    <a
+                                          
+                      key={f.id}
+                      href={data.publicUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="tick card-lift border border-line rounded-[6px] bg-surface overflow-hidden flex flex-col items-center justify-center text-center h-28"
+                    >
+                      {f.file_type?.startsWith("image/") ? (
+                        <img src={data.publicUrl} alt={f.file_name} className="w-full h-full object-cover" />
+                      ) : (
+                        <>
+                          <span className="text-[20px]">📄</span>
+                          <span className="text-[12px] text-inksoft truncate w-full px-1 mt-2">{f.file_name}</span>
+                        </>
+                      )}
+                    </a>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
@@ -88,17 +125,15 @@ export default function ProjectDetailPage() {
               </>
             )}
           </div>
-        </aside>
-           </div>
 
-      <div className="mt-10">
-        <MessageButton project={p} router={router} supabase={supabase} />
+          <MessageButtons project={p} ownerName={ownerName} router={router} supabase={supabase} />
+        </aside>
       </div>
     </div>
   );
 }
 
-function MessageButton({ project, router, supabase }) {
+function MessageButtons({ project, ownerName, router, supabase }) {
   const [user, setUser] = useState(undefined);
 
   useEffect(() => {
@@ -106,11 +141,17 @@ function MessageButton({ project, router, supabase }) {
   }, []);
 
   if (user === undefined) return null;
-  if (!user) return <div className="text-[13.5px] text-inksoft">Log in to message about this project.</div>;
+  if (!user) {
+    return (
+      <div className="border border-line rounded-[6px] bg-surface p-5 text-[13.5px] text-inksoft">
+        Log in to message about this project.
+      </div>
+    );
+  }
 
   const isOwner = user.id === project.owner_id;
 
-  async function openChat() {
+  async function goToThread() {
     if (isOwner) {
       router.push("/messages");
       return;
@@ -133,9 +174,22 @@ function MessageButton({ project, router, supabase }) {
     router.push(`/messages/${data.id}`);
   }
 
+  if (isOwner) {
+    return (
+      <button onClick={goToThread} className="btn-press w-full bg-ink text-paper hover:bg-accent font-medium text-[14px] px-5 py-2.5 rounded-[4px]">
+        View Messages
+      </button>
+    );
+  }
+
   return (
-    <button onClick={openChat} className="btn-press bg-ink text-paper hover:bg-accent font-medium text-[14px] px-5 py-2.5 rounded-[4px]">
-      {isOwner ? "View Messages" : "Offer to Help"}
-    </button>
+    <div className="space-y-2.5">
+      <button onClick={goToThread} className="btn-press w-full bg-ink text-paper hover:bg-accent font-medium text-[14px] px-5 py-2.5 rounded-[4px]">
+        💬 Chat with {ownerName}
+      </button>
+      <button onClick={goToThread} className="btn-press w-full border border-line text-ink hover:border-accent font-medium text-[14px] px-5 py-2.5 rounded-[4px]">
+        Make an Offer
+      </button>
+    </div>
   );
 }

@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "../../lib/supabase/client";
-import { Avatar, Pill, money, initials, PrimaryButton, IconPlus, IconBriefcase, IconCheck } from "../../components/ui";
+import { Avatar, Pill, money, initials, PrimaryButton, IconPlus, IconBriefcase, IconCheck, StatusBadge } from "../../components/ui";
 
 export default function DashboardPage() {
   const supabase = createClient();
@@ -23,7 +23,22 @@ export default function DashboardPage() {
       .then(({ data }) => setMyProjects(data || []));
   }, [user]);
 
-  if (!user || !profile) return <div className="max-w-3xl mx-auto px-5 py-16 text-inksoft">Loading…</div>;
+  if (!user || !profile) {
+    return (
+      <div className="max-w-6xl mx-auto px-5 md:px-8 py-10 animate-pulse">
+        <div className="flex items-center gap-3 mb-8">
+          <div className="w-11 h-11 rounded-full bg-paperdim"></div>
+          <div className="space-y-2">
+            <div className="h-5 w-48 bg-paperdim rounded"></div>
+            <div className="h-3 w-24 bg-paperdim rounded"></div>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+          {[1, 2].map((i) => <div key={i} className="border border-line rounded-[6px] p-5 h-28 bg-paperdim/40"></div>)}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto px-5 md:px-8 py-10">
@@ -57,8 +72,11 @@ export default function DashboardPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {myProjects.map((p) => (
-            <a key={p.id} href={`/projects/${p.id}`} className="border border-line rounded-[6px] bg-surface p-5 block hover:border-accent transition-colors">
-              <Pill className="mb-3">{p.category}</Pill>
+                        <a key={p.id} href={`/projects/${p.id}`} className="border border-line rounded-[6px] bg-surface p-5 block hover:border-accent transition-colors">
+              <div className="flex items-center gap-2 mb-3">
+                <Pill>{p.category}</Pill>
+                <StatusBadge status={p.status} />
+              </div>
               <h3 className="font-display font-bold text-[15px] text-ink mb-2">{p.title}</h3>
               <div className="text-[13px] font-mono text-accent">{money(p.budget)}</div>
             </a>
