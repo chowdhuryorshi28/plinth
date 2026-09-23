@@ -76,10 +76,17 @@ export default function FeedPage() {
     <div>
           <section className="border-b border-line">
         <div className="max-w-7xl mx-auto px-5 md:px-8 pt-10 pb-14">
-          <div className="sheet px-6 md:px-14 pt-14 pb-12 md:pt-20 md:pb-16">
+                    <div className="sheet px-6 md:px-14 pt-14 pb-12 md:pt-20 md:pb-16">
+            <div className="bg-slides">
+              <div className="bg-slide"></div>
+              <div className="bg-slide"></div>
+              <div className="bg-slide"></div>
+              <div className="bg-slide"></div>
+              <div className="bg-slide"></div>
+            </div>
             <div className="crop-tl"></div>
             <div className="crop-br"></div>
-            <div className="max-w-2xl relative">
+                      <div className="max-w-2xl relative z-10">
               <span className="inline-flex items-center gap-2 font-mono text-[12px] text-accent border border-accent bg-accent/10 px-2.5 py-1 rounded-full mb-7">
                 <span className="w-1.5 h-1.5 rounded-full bg-accent"></span> Open for new projects
               </span>
