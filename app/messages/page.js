@@ -18,11 +18,11 @@ export default function MessagesPage() {
     if (!user) return;
     supabase
       .from("threads")
-      .select(`
+           .select(`
         *,
         projects(title, owner_id),
-        owner:profiles!threads_owner_id_fkey(display_name),
-        helper:profiles!threads_helper_id_fkey(display_name)
+        owner:profiles!threads_owner_id_fkey(display_name, avatar_url),
+        helper:profiles!threads_helper_id_fkey(display_name, avatar_url)
       `)
       .or(`owner_id.eq.${user.id},helper_id.eq.${user.id}`)
       .order("created_at", { ascending: false })
@@ -66,13 +66,14 @@ export default function MessagesPage() {
         {threads.map((t) => {
           const isOwner = t.owner_id === user.id;
           const otherName = isOwner ? t.helper?.display_name : t.owner?.display_name;
+          const otherAvatar = isOwner ? t.helper?.avatar_url : t.owner?.avatar_url;
           return (
             <button
               key={t.id}
               onClick={() => router.push(`/messages/${t.id}`)}
               className="w-full flex items-center gap-3.5 px-5 py-4 text-left hover:bg-paperdim/60 transition-colors"
             >
-              <Avatar tag={initials(otherName || "Agent")} size={36} />
+             <Avatar tag={initials(otherName || "Agent")} size={36} src={otherAvatar} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-[13.5px] font-medium text-ink">{otherName || "Agent"}</span>

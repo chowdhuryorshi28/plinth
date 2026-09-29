@@ -20,7 +20,7 @@ function ProjectCard({ p }) {
       <h3 className="font-display font-bold text-[17px] leading-snug text-ink">{p.title}</h3>
       <p className="text-[13.5px] text-inksoft leading-relaxed line-clamp-3">{p.description}</p>
       <div className="flex items-center gap-2 pt-1">
-        <Avatar tag={initials(p.owner_name)} size={22} />
+                <Avatar tag={initials(p.owner_name)} size={22} src={p.owner_avatar} />
         <span className="text-[13px] text-ink font-medium">{p.owner_name}</span>
       </div>
       <div className="mt-auto pt-3 border-t border-line grid grid-cols-2 gap-3">
@@ -53,12 +53,12 @@ export default function FeedPage() {
       // Join each project with its owner's display name from "profiles".
       const { data, error } = await supabase
         .from("projects")
-        .select("*, profiles!projects_owner_id_fkey(display_name)")
+               .select("*, profiles!projects_owner_id_fkey(display_name, avatar_url)")
         .order("created_at", { ascending: false })
         .limit(50);
       if (cancelled) return;
       if (error) { console.error(error); setProjects([]); }
-      else setProjects(data.map((p) => ({ ...p, owner_name: p.profiles?.display_name || "Agent" })));
+           else setProjects(data.map((p) => ({ ...p, owner_name: p.profiles?.display_name || "Agent", owner_avatar: p.profiles?.avatar_url })));
       setLoading(false);
     }
     load();

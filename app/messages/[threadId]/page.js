@@ -11,7 +11,7 @@ export default function ChatDetailPage() {
 
   const [user, setUser] = useState(undefined);
   const [thread, setThread] = useState(undefined);
-  const [project, setProject] = useState(null);
+  const [project, setProject] = useState(undefined);
   const [messages, setMessages] = useState([]);
   const [deal, setDeal] = useState(null);
    const [text, setText] = useState("");
@@ -28,22 +28,22 @@ export default function ChatDetailPage() {
   useEffect(() => {
     supabase
       .from("threads")
-      .select(`
+          .select(`
         *,
-        owner:profiles!threads_owner_id_fkey(display_name),
-        helper:profiles!threads_helper_id_fkey(display_name)
+        owner:profiles!threads_owner_id_fkey(display_name, avatar_url),
+        helper:profiles!threads_helper_id_fkey(display_name, avatar_url)
       `)
       .eq("id", threadId)
       .single()
       .then(({ data }) => setThread(data || null));
   }, [threadId]);
 
-  useEffect(() => {
+   useEffect(() => {
     if (!thread) return;
+    if (!thread.project_id) { setProject(false); return; } // false = no project, not "still loading"
     supabase.from("projects").select("*").eq("id", thread.project_id).single()
       .then(({ data }) => setProject(data || null));
   }, [thread]);
-
   useEffect(() => {
     if (!thread || !user) return;
 
@@ -153,8 +153,11 @@ export default function ChatDetailPage() {
 
   const fmtTime = (ts) => new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
-  if (user === undefined || thread === undefined || !project) {
+  if (user === undefined || thread === undefined || project === undefined) {
     return <div className="max-w-6xl mx-auto px-5 py-16 text-inksoft">Loading…</div>;
+  }
+  if (project === null) {
+    return <div className="max-w-6xl mx-auto px-5 py-16 text-inksoft">Conversation not found.</div>;
   }
   if (!thread || !user || (user.id !== thread.owner_id && user.id !== thread.helper_id)) {
     return <div className="max-w-6xl mx-auto px-5 py-16 text-inksoft">Conversation not found.</div>;
@@ -162,6 +165,7 @@ export default function ChatDetailPage() {
 
   const isOwner = user.id === thread.owner_id;
   const otherName = isOwner ? thread.helper?.display_name : thread.owner?.display_name;
+    const otherAvatar = isOwner ? thread.helper?.avatar_url : thread.owner?.avatar_url;
 
   return (
     <div className="max-w-6xl mx-auto px-5 md:px-8 py-8">
@@ -170,35 +174,44 @@ export default function ChatDetailPage() {
       </button>
 
       <div className="grid grid-cols-1 lg:grid-cols-[300px_1fr] gap-6 lg:h-[640px]">
-        {/* Left: project info */}
+      {/* Left: project info (or a simple direct-message notice) */}
         <div className="border border-line rounded-[6px] bg-surface p-5 space-y-5 lg:overflow-y-auto">
-          <div>
-            <Pill className="mb-3">{project.category}</Pill>
-            <h3
-              className="font-display font-bold text-[16px] text-ink leading-snug cursor-pointer hover:text-accent"
-              onClick={() => router.push(`/projects/${project.id}`)}
-            >
-              {project.title}
-            </h3>
-          </div>
-          <div className="flex items-center gap-2">
-            <Avatar tag={initials(otherName || "Agent")} size={26} />
-            <span className="text-[13px] text-ink">{otherName || "Agent"}</span>
-          </div>
-          <div className="h-px bg-line"></div>
-          <div className="space-y-3 text-[13px]">
-            <div className="flex justify-between"><span className="text-inksoft">Deadline</span><span className="font-mono text-ink">{project.deadline}</span></div>
-            <div className="flex justify-between"><span className="text-inksoft">Est. work</span><span className="font-mono text-ink">{project.workload}</span></div>
-            <div className="flex justify-between"><span className="text-inksoft">Listed budget</span><span className="font-mono text-ink">{money(project.budget)}</span></div>
-          </div>
-          {project.software?.length > 0 && (
+          {!project ? (
+            <div>
+              <h3 className="font-display font-bold text-[16px] text-ink leading-snug">Direct message</h3>
+              <p className="text-[13px] text-inksoft mt-2">This conversation isn't tied to a specific project.</p>
+            </div>
+          ) : (
             <>
-              <div className="h-px bg-line"></div>
-              <div className="flex flex-wrap gap-1.5">
-                {project.software.map((s) => (
-                  <span key={s} className="text-[11px] text-inksoft bg-paperdim px-2 py-0.5 rounded-[3px] border border-line">{s}</span>
-                ))}
+              <div>
+                <Pill className="mb-3">{project.category}</Pill>
+                <h3
+                  className="font-display font-bold text-[16px] text-ink leading-snug cursor-pointer hover:text-accent"
+                  onClick={() => router.push(`/projects/${project.id}`)}
+                >
+                  {project.title}
+                </h3>
               </div>
+              <div className="flex items-center gap-2">
+                <Avatar tag={initials(otherName || "Agent")} size={26} />
+                <span className="text-[13px] text-ink">{otherName || "Agent"}</span>
+              </div>
+              <div className="h-px bg-line"></div>
+              <div className="space-y-3 text-[13px]">
+                <div className="flex justify-between"><span className="text-inksoft">Deadline</span><span className="font-mono text-ink">{project.deadline}</span></div>
+                <div className="flex justify-between"><span className="text-inksoft">Est. work</span><span className="font-mono text-ink">{project.workload}</span></div>
+                <div className="flex justify-between"><span className="text-inksoft">Listed budget</span><span className="font-mono text-ink">{money(project.budget)}</span></div>
+              </div>
+              {project.software?.length > 0 && (
+                <>
+                  <div className="h-px bg-line"></div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {project.software.map((s) => (
+                      <span key={s} className="text-[11px] text-inksoft bg-paperdim px-2 py-0.5 rounded-[3px] border border-line">{s}</span>
+                    ))}
+                  </div>
+                </>
+              )}
             </>
           )}
         </div>
@@ -206,7 +219,7 @@ export default function ChatDetailPage() {
         {/* Right: conversation */}
         <div className="border border-line rounded-[6px] bg-surface flex flex-col overflow-hidden">
           <div className="flex items-center gap-3 px-5 py-4 border-b border-line shrink-0">
-            <Avatar tag={initials(otherName || "Agent")} size={32} />
+                      <Avatar tag={initials(otherName || "Agent")} size={32} src={otherAvatar} />
             <div>
               <div className="text-[13.5px] font-medium text-ink">{otherName || "Agent"}</div>
               {deal && (

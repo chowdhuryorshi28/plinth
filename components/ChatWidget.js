@@ -43,7 +43,7 @@ export default function ChatWidget() {
     if (!open || !user || activeThread) return;
     supabase
       .from("threads")
-      .select(`*, owner:profiles!threads_owner_id_fkey(display_name), helper:profiles!threads_helper_id_fkey(display_name), projects(title)`)
+            .select(`*, owner:profiles!threads_owner_id_fkey(display_name, avatar_url), helper:profiles!threads_helper_id_fkey(display_name, avatar_url), projects(title)`)
       .or(`owner_id.eq.${user.id},helper_id.eq.${user.id}`)
       .order("created_at", { ascending: false })
       .then(({ data }) => setThreads(data || []));
@@ -125,9 +125,9 @@ export default function ChatWidget() {
             {activeThread ? (
               <>
                 <button onClick={() => setActiveThread(null)} className="text-inksoft hover:text-ink text-[15px]">←</button>
-                <Avatar tag={initials(
+                               <Avatar tag={initials(
                   (activeThread.owner_id === user.id ? activeThread.helper?.display_name : activeThread.owner?.display_name) || "Agent"
-                )} size={24} />
+                )} size={24} src={activeThread.owner_id === user.id ? activeThread.helper?.avatar_url : activeThread.owner?.avatar_url} />
                 <span className="text-[13px] font-medium text-ink truncate">
                   {(activeThread.owner_id === user.id ? activeThread.helper?.display_name : activeThread.owner?.display_name) || "Agent"}
                 </span>
@@ -146,10 +146,11 @@ export default function ChatWidget() {
               )}
               {threads.map((t) => {
                 const otherName = t.owner_id === user.id ? t.helper?.display_name : t.owner?.display_name;
+                const otherAvatar = t.owner_id === user.id ? t.helper?.avatar_url : t.owner?.avatar_url;
                 return (
                   <button key={t.id} onClick={() => setActiveThread(t)}
                     className="w-full flex items-center gap-2.5 px-4 py-3 text-left hover:bg-paperdim/60">
-                    <Avatar tag={initials(otherName || "Agent")} size={28} />
+                    <Avatar tag={initials(otherName || "Agent")} size={28}  src={otherAvatar}/>
                     <div className="min-w-0">
                       <div className="text-[12.5px] font-medium text-ink truncate">{otherName || "Agent"}</div>
                       <div className="text-[11px] text-inksoft truncate">{t.projects?.title}</div>

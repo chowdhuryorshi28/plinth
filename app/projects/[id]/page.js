@@ -13,7 +13,7 @@ export default function ProjectDetailPage() {
 
   useEffect(() => {
     let cancelled = false;
-    supabase.from("projects").select("*, profiles!projects_owner_id_fkey(display_name, agent_code)")
+        supabase.from("projects").select("*, profiles!projects_owner_id_fkey(display_name, agent_code, avatar_url)")
       .eq("id", id).single()
       .then(({ data }) => { if (!cancelled) setP(data || null); });
     return () => { cancelled = true; };
@@ -41,7 +41,7 @@ export default function ProjectDetailPage() {
       </div>
       <h1 className="font-display font-extrabold text-[28px] md:text-[34px] text-ink leading-tight max-w-2xl">{p.title}</h1>
       <div className="flex items-center gap-3 mt-4 mb-10">
-        <Avatar tag={initials(ownerName)} size={30} />
+              <Avatar tag={initials(ownerName)} size={30} src={p.profiles?.avatar_url} />
         <div>
           <div className="text-[13.5px] text-ink font-medium">Posted by {ownerName}</div>
           <div className="text-[12px] text-inksoft">{new Date(p.created_at).toLocaleString()}</div>

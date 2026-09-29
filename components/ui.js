@@ -32,8 +32,18 @@ export function makeAgentCode() {
   return "AG-" + s;
 }
 
-export function Avatar({ tag, size = 36 }) {
+export function Avatar({ tag, size = 36, src }) {
   const hue = (tag.charCodeAt(0) * 37 + (tag.charCodeAt(1) || 0) * 17) % 360;
+  if (src) {
+    return (
+      <img
+        src={src}
+        alt={tag}
+        style={{ width: size, height: size }}
+        className="rounded-full object-cover shrink-0 border border-line"
+      />
+    );
+  }
   return (
     <div
       style={{ width: size, height: size, background: `hsl(${hue} 45% 93%)`, color: `hsl(${hue} 40% 32%)` }}
@@ -43,7 +53,6 @@ export function Avatar({ tag, size = 36 }) {
     </div>
   );
 }
-
 export function Pill({ children, tone = "default", className = "" }) {
   const tones = {
     default: "bg-paperdim text-inksoft border-line",

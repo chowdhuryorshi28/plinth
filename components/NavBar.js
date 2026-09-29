@@ -49,7 +49,12 @@ export default function NavBar() {
     router.push("/");
     router.refresh();
   };
-
+  const toggleMode = async () => {
+    const next = profile?.current_mode === "agent" ? "client" : "agent";
+    await supabase.from("profiles").update({ current_mode: next }).eq("id", user.id);
+    setProfile((p) => ({ ...p, current_mode: next }));
+    router.refresh();
+  };
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-paper/90 backdrop-blur">
       <div className="max-w-7xl mx-auto px-5 md:px-8 h-16 flex items-center justify-between">
@@ -63,8 +68,18 @@ export default function NavBar() {
         <nav className="hidden md:flex items-center gap-4">
           {user ? (
             <>
-              <PrimaryButton onClick={() => router.push("/post")}><IconPlus size={15} /> Post a Project</PrimaryButton>
-                                        <Link href="/dashboard" className="text-[14px] text-inksoft hover:text-ink">Dashboard</Link>
+                            <button
+                onClick={toggleMode}
+                className="flex items-center gap-1.5 text-[13px] font-medium border border-line rounded-full px-1 py-1 hover:border-ink"
+              >
+                <span className={`px-2.5 py-1 rounded-full transition-colors ${profile?.current_mode !== "agent" ? "bg-ink text-paper" : "text-inksoft"}`}>Client</span>
+                <span className={`px-2.5 py-1 rounded-full transition-colors ${profile?.current_mode === "agent" ? "bg-ink text-paper" : "text-inksoft"}`}>Agent</span>
+              </button>
+              {profile?.current_mode !== "agent" && (
+                <PrimaryButton onClick={() => router.push("/post")}><IconPlus size={15} /> Post a Project</PrimaryButton>
+              )}
+                            <Link href="/agents" className="text-[14px] text-inksoft hover:text-ink">Find Agents</Link>
+              <Link href="/dashboard" className="text-[14px] text-inksoft hover:text-ink">Dashboard</Link>
               <Link href="/messages" className="relative text-[14px] text-inksoft hover:text-ink">
                 Messages
                 {unreadCount > 0 && (
@@ -73,8 +88,8 @@ export default function NavBar() {
                   </span>
                 )}
               </Link>
-              <Link href="/profile">
-                <Avatar tag={profile ? initials(profile.display_name) : "?"} size={36} />
+                          <Link href="/profile">
+                <Avatar tag={profile ? initials(profile.display_name) : "?"} size={36} src={profile?.avatar_url} />
               </Link>
               <button onClick={logout} className="text-[13px] text-inksoft hover:text-ink">Log out</button>
             </>
@@ -96,7 +111,13 @@ export default function NavBar() {
           <Link href="/" onClick={() => setMobileOpen(false)}>Discover</Link>
           {user ? (
             <>
-              <Link href="/post" onClick={() => setMobileOpen(false)}>Post a Project</Link>
+                            <button onClick={toggleMode} className="text-left text-inksoft">
+                Switch to {profile?.current_mode === "agent" ? "Client" : "Agent"} mode
+              </button>
+              {profile?.current_mode !== "agent" && (
+                <Link href="/post" onClick={() => setMobileOpen(false)}>Post a Project</Link>
+              )}
+                            <Link href="/agents" onClick={() => setMobileOpen(false)}>Find Agents</Link>
               <Link href="/dashboard" onClick={() => setMobileOpen(false)}>Dashboard</Link>
               <Link href="/messages" onClick={() => setMobileOpen(false)}>Messages</Link>
               <Link href="/profile" onClick={() => setMobileOpen(false)}>Profile</Link>
