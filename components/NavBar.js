@@ -58,9 +58,12 @@ export default function NavBar() {
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-paper/90 backdrop-blur">
       <div className="max-w-7xl mx-auto px-5 md:px-8 h-16 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2">
-          <span className="relative w-7 h-7 flex items-center justify-center rounded-[4px] border border-line">
-            <span className="w-1.5 h-1.5 rounded-full bg-accent"></span>
+                <Link href="/" className="flex items-center gap-2.5">
+          <span className="relative w-7 h-7 flex items-center justify-center">
+            <span className="absolute inset-0 border border-line rounded-[4px]"></span>
+            <span className="absolute top-0 left-0 w-2 h-2 border-t border-l border-accent"></span>
+            <span className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-accent"></span>
+            <span className="w-1 h-1 rounded-full bg-accent"></span>
           </span>
           <span className="font-display font-extrabold text-[19px] tracking-tight text-ink">Plinth</span>
         </Link>
@@ -68,15 +71,17 @@ export default function NavBar() {
         <nav className="hidden md:flex items-center gap-4">
           {user ? (
             <>
-                            <button
+                                       <button
                 onClick={toggleMode}
                 className="flex items-center gap-1.5 text-[13px] font-medium border border-line rounded-full px-1 py-1 hover:border-ink"
               >
-                <span className={`px-2.5 py-1 rounded-full transition-colors ${profile?.current_mode !== "agent" ? "bg-ink text-paper" : "text-inksoft"}`}>Client</span>
-                <span className={`px-2.5 py-1 rounded-full transition-colors ${profile?.current_mode === "agent" ? "bg-ink text-paper" : "text-inksoft"}`}>Agent</span>
+                <span className={`px-2.5 py-1 rounded-full transition-colors ${profile?.current_mode !== "agent" ? "bg-accent text-white" : "text-inksoft"}`}>Client</span>
+                <span className={`px-2.5 py-1 rounded-full transition-colors ${profile?.current_mode === "agent" ? "bg-[var(--amber)] text-[#1B1505]" : "text-inksoft"}`}>Agent</span>
               </button>
-              {profile?.current_mode !== "agent" && (
+                          {profile?.current_mode !== "agent" ? (
                 <PrimaryButton onClick={() => router.push("/post")}><IconPlus size={15} /> Post a Project</PrimaryButton>
+              ) : (
+                <PrimaryButton onClick={() => router.push("/")}>Browse Open Projects</PrimaryButton>
               )}
                             <Link href="/agents" className="text-[14px] text-inksoft hover:text-ink">Find Agents</Link>
               <Link href="/dashboard" className="text-[14px] text-inksoft hover:text-ink">Dashboard</Link>

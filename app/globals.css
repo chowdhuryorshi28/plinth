@@ -6,6 +6,7 @@
   --bg:#16150F; --bg-dim:#1D1B15; --surface:#201E17;
   --ink:#F3F0E7; --ink-soft:#AFA89A; --line:#34311F;
   --accent:#7C90F2; --accent-soft:#232A4E; --accent-ink:#CBD4FB;
+  --amber:#D7A354; --amber-soft:#3A2F1C;
 }
 body{
   background: var(--bg);
@@ -79,3 +80,27 @@ input, textarea, select { background: var(--surface); }
   .bg-slide:nth-child(1){ opacity:1; }
   .bg-slide:nth-child(2), .bg-slide:nth-child(3), .bg-slide:nth-child(4), .bg-slide:nth-child(5){ display:none; }
 }
+/* --- section-level drafting sheet, used beyond the hero --- */
+.sheet-section{
+  position:relative; border-top:1px solid var(--line); border-bottom:1px solid var(--line);
+  background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size:40px 40px;
+}
+.sheet-section::before{
+  content:""; position:absolute; inset:0;
+  background:linear-gradient(180deg, var(--bg) 0%, transparent 12%, transparent 88%, var(--bg) 100%);
+  pointer-events:none;
+}
+
+/* --- dimension-line stat block, replaces plain icon+number cards --- */
+.dim-stat{ position:relative; padding-top:12px; }
+.dim-stat::before{
+  content:""; position:absolute; top:0; left:0; width:100%; height:5px;
+  border-top:1px solid var(--ink-soft); border-left:1px solid var(--ink-soft); border-right:1px solid var(--ink-soft);
+}
+.dim-stat-num{ font-family:'Manrope',sans-serif; font-weight:700; }
+.dim-stat-label{ font-family:'JetBrains Mono',monospace; color:var(--ink-soft); }
+
+/* --- amber accent, used only for in-progress/pending/specialty states --- */
+.amber-pill{ background:var(--amber-soft); color:var(--amber); border:1px solid var(--amber); }
+.amber-text{ color:var(--amber); }

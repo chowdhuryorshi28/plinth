@@ -153,7 +153,8 @@ export default function FeedPage() {
         </div>
       </section>
 
-      <section className="max-w-7xl mx-auto px-5 md:px-8 py-12">
+            <section className="sheet-section">
+        <div className="relative z-10 max-w-7xl mx-auto px-5 md:px-8 py-12">
         <h2 className="font-display font-bold text-[22px] text-ink mb-7">Open projects</h2>
         
                {loading ? (
@@ -173,9 +174,10 @@ export default function FeedPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {filtered.map((p) => <ProjectCard key={p.id} p={p} />)}
+                      {filtered.map((p) => <ProjectCard key={p.id} p={p} />)}
           </div>
         )}
+        </div>
       </section>
     </div>
   );

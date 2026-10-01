@@ -17,6 +17,11 @@ export default function ChatDetailPage() {
    const [text, setText] = useState("");
   const [amount, setAmount] = useState("");
   const [otherTyping, setOtherTyping] = useState(false);
+  const [ratingStars, setRatingStars] = useState(0);
+  const [linkedOffer, setLinkedOffer] = useState(null);
+  const [ratingComment, setRatingComment] = useState("");
+  const [ratingSubmitted, setRatingSubmitted] = useState(false);
+  const [submittingRating, setSubmittingRating] = useState(false);
   const bottomRef = useRef(null);
   const channelRef = useRef(null);
   const typingTimeoutRef = useRef(null);
@@ -52,13 +57,26 @@ export default function ChatDetailPage() {
         .order("created_at", { ascending: true })
         .then(({ data }) => setMessages(data || []));
     };
-    const loadDeal = () => {
+       const loadDeal = () => {
       supabase.from("deals").select("*").eq("thread_id", thread.id).maybeSingle()
-        .then(({ data }) => setDeal(data || null));
+        .then(({ data }) => {
+          setDeal(data || null);
+          if (data) {
+            supabase.from("ratings").select("id").eq("deal_id", data.id).maybeSingle()
+              .then(({ data: existingRating }) => setRatingSubmitted(!!existingRating));
+          }
+        });
     };
 
-    loadMessages();
+        loadMessages();
     loadDeal();
+    if (thread.project_id) {
+      supabase.from("offers").select("*").eq("project_id", thread.project_id).eq("agent_id", thread.helper_id).maybeSingle()
+        .then(({ data }) => {
+          setLinkedOffer(data || null);
+          if (data && !amount) setAmount(String(data.amount));
+        });
+    }
     supabase.from("messages").update({ read_at: new Date().toISOString() })
       .eq("thread_id", thread.id).neq("sender_id", user.id).is("read_at", null)
       .then(() => {});
@@ -129,7 +147,7 @@ export default function ChatDetailPage() {
     }
   }
 
-  async function acceptOffer() {
+   async function acceptOffer() {
     const amt = parseInt(amount, 10);
     if (!amt || amt <= 0) return;
     const { data, error } = await supabase.from("deals").insert({
@@ -141,14 +159,42 @@ export default function ChatDetailPage() {
       await supabase.from("projects").update({ status: "in_progress" }).eq("id", project.id);
       setThread({ ...thread, status: "deal_accepted" });
       setDeal(data);
+
+      if (linkedOffer) {
+        await supabase.from("offers").update({ status: "accepted" }).eq("id", linkedOffer.id);
+        await supabase.from("offers").update({ status: "declined" })
+          .eq("project_id", project.id).neq("id", linkedOffer.id).in("status", ["pending", "shortlisted"]);
+      }
     }
   }
 
   async function markComplete() {
     if (!deal) return;
     await supabase.from("deals").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", deal.id);
-    await supabase.from("projects").update({ status: "completed" }).eq("id", project.id);
+    if (project) await supabase.from("projects").update({ status: "completed" }).eq("id", project.id);
     setDeal({ ...deal, status: "completed" });
+  }
+
+  async function submitRating() {
+    if (!deal || !ratingStars) return;
+    setSubmittingRating(true);
+    const { error } = await supabase.from("ratings").insert({
+      deal_id: deal.id,
+      rater_id: user.id,
+      ratee_id: deal.helper_id,
+      stars: ratingStars,
+      comment: ratingComment.trim(),
+    });
+    if (!error) {
+      // update the agent's aggregate rating shown everywhere
+      const { data: agentProfile } = await supabase.from("profiles").select("rating_sum, rating_count").eq("id", deal.helper_id).single();
+      await supabase.from("profiles").update({
+        rating_sum: (agentProfile?.rating_sum || 0) + ratingStars,
+        rating_count: (agentProfile?.rating_count || 0) + 1,
+      }).eq("id", deal.helper_id);
+      setRatingSubmitted(true);
+    }
+    setSubmittingRating(false);
   }
 
   const fmtTime = (ts) => new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -273,36 +319,68 @@ export default function ChatDetailPage() {
             <div ref={bottomRef}></div>
           </div>
 
-          {/* Negotiation / deal card */}
+                   {/* Negotiation / deal card */}
           <div className="border-t border-line px-5 py-4 bg-paperdim/60 shrink-0">
             {deal ? (
-              <div className="flex items-center justify-between flex-wrap gap-4">
-                <div className="flex items-center gap-6">
-                  <div>
-                    <div className="text-[10.5px] uppercase tracking-wide text-inksoft">Agreed</div>
-                    <div className="text-[18px] font-mono font-bold text-ink">{money(deal.amount)}</div>
+              <div>
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div className="flex items-center gap-6">
+                    <div>
+                      <div className="text-[10.5px] uppercase tracking-wide text-inksoft">Agreed</div>
+                      <div className="text-[18px] font-mono font-bold text-ink">{money(deal.amount)}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10.5px] uppercase tracking-wide text-inksoft">Platform fee</div>
+                      <div className="text-[14px] font-mono text-ink">{money(deal.fee)}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10.5px] uppercase tracking-wide text-inksoft">Helper receives</div>
+                      <div className="text-[14px] font-mono text-accent font-semibold">{money(deal.payout)}</div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="text-[10.5px] uppercase tracking-wide text-inksoft">Platform fee</div>
-                    <div className="text-[14px] font-mono text-ink">{money(deal.fee)}</div>
-                  </div>
-                  <div>
-                    <div className="text-[10.5px] uppercase tracking-wide text-inksoft">Helper receives</div>
-                    <div className="text-[14px] font-mono text-accent font-semibold">{money(deal.payout)}</div>
-                  </div>
+                  {isOwner && deal.status !== "completed" && (
+                    <button onClick={markComplete} className="btn-press bg-ink text-paper hover:bg-accent font-medium text-[13.5px] px-4 py-2.5 rounded-[4px]">
+                      Mark Complete
+                    </button>
+                  )}
                 </div>
-                {isOwner && deal.status !== "completed" && (
-                  <button onClick={markComplete} className="btn-press bg-ink text-paper hover:bg-accent font-medium text-[13.5px] px-4 py-2.5 rounded-[4px]">
-                    Mark Complete
-                  </button>
+
+                {isOwner && deal.status === "completed" && !ratingSubmitted && (
+                  <div className="mt-4 pt-4 border-t border-line">
+                    <p className="text-[13px] text-ink font-medium mb-2">Rate this agent</p>
+                    <div className="flex items-center gap-1 mb-3">
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <button key={n} onClick={() => setRatingStars(n)} className="text-[22px] leading-none">
+                          {n <= ratingStars ? "★" : "☆"}
+                        </button>
+                      ))}
+                    </div>
+                    <input
+                      value={ratingComment}
+                      onChange={(e) => setRatingComment(e.target.value)}
+                      placeholder="Optional comment…"
+                      className="w-full h-10 px-3 rounded-[4px] border border-line text-[13px] text-ink mb-2 bg-paper"
+                    />
+                    <button
+                      onClick={submitRating}
+                      disabled={!ratingStars || submittingRating}
+                      className="btn-press bg-ink text-paper hover:bg-accent font-medium text-[13px] px-4 py-2 rounded-[4px] disabled:opacity-40"
+                    >
+                      {submittingRating ? "Submitting…" : "Submit rating"}
+                    </button>
+                  </div>
+                )}
+
+                {isOwner && deal.status === "completed" && ratingSubmitted && (
+                  <p className="text-[12.5px] text-accent mt-4 pt-4 border-t border-line">✓ You rated this agent</p>
                 )}
               </div>
-            ) : isOwner ? (
+                       ) : isOwner ? (
               <div className="flex items-center gap-2">
                 <input
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
-                  placeholder="Agreed amount"
+                  placeholder={linkedOffer ? `Offer: ৳${linkedOffer.amount}` : "Agreed amount"}
                   type="number"
                   className="border border-line rounded-[4px] px-3 py-2 text-[13.5px] text-ink w-40 font-mono bg-paper"
                 />

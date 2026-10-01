@@ -127,6 +127,8 @@ export default function ProjectDetailPage() {
           </div>
 
           <MessageButtons project={p} ownerName={ownerName} router={router} supabase={supabase} />
+          <OffersList project={p} router={router} supabase={supabase} />
+          <DeleteButton project={p} router={router} supabase={supabase} />
         </aside>
       </div>
     </div>
@@ -182,14 +184,233 @@ function MessageButtons({ project, ownerName, router, supabase }) {
     );
   }
 
-  return (
+    return (
     <div className="space-y-2.5">
       <button onClick={goToThread} className="btn-press w-full bg-ink text-paper hover:bg-accent font-medium text-[14px] px-5 py-2.5 rounded-[4px]">
         💬 Chat with {ownerName}
       </button>
-      <button onClick={goToThread} className="btn-press w-full border border-line text-ink hover:border-accent font-medium text-[14px] px-5 py-2.5 rounded-[4px]">
+      <OfferForm project={project} user={user} supabase={supabase} />
+    </div>
+  );
+}
+
+function OfferForm({ project, user, supabase }) {
+  const [existingOffer, setExistingOffer] = useState(undefined);
+  const [showForm, setShowForm] = useState(false);
+  const [amount, setAmount] = useState("");
+  const [days, setDays] = useState("");
+  const [pitch, setPitch] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    supabase.from("offers").select("*").eq("project_id", project.id).eq("agent_id", user.id).maybeSingle()
+      .then(({ data }) => setExistingOffer(data || null));
+  }, []);
+
+  async function submitOffer(e) {
+    e.preventDefault();
+    const amt = parseInt(amount, 10);
+    const d = parseInt(days, 10);
+    if (!amt || amt <= 0 || !d || d <= 0) return;
+    setSubmitting(true);
+    const { data, error } = await supabase.from("offers").insert({
+      project_id: project.id,
+      agent_id: user.id,
+      amount: amt,
+      delivery_days: d,
+      pitch: pitch.trim(),
+    }).select().single();
+    if (!error) {
+      setExistingOffer(data);
+      setShowForm(false);
+    }
+    setSubmitting(false);
+  }
+
+  if (existingOffer === undefined) return null;
+
+  if (existingOffer) {
+    const statusLabel = {
+      pending: "Offer sent — waiting for a response",
+      shortlisted: "You've been shortlisted!",
+      declined: "This offer wasn't selected",
+      accepted: "Your offer was accepted 🎉",
+    }[existingOffer.status];
+    return (
+      <div className="border border-line rounded-[4px] px-4 py-3 text-[13px] text-ink bg-paperdim">
+        {statusLabel} — ৳{existingOffer.amount}, {existingOffer.delivery_days} day{existingOffer.delivery_days > 1 ? "s" : ""}
+      </div>
+    );
+  }
+
+  if (!showForm) {
+    return (
+      <button onClick={() => setShowForm(true)} className="btn-press w-full border border-line text-ink hover:border-accent font-medium text-[14px] px-5 py-2.5 rounded-[4px]">
         Make an Offer
       </button>
+    );
+  }
+
+  return (
+    <form onSubmit={submitOffer} className="border border-line rounded-[6px] bg-surface p-4 space-y-3">
+      <div>
+        <label className="text-[12px] text-inksoft mb-1 block">Your price (৳)</label>
+        <input required type="number" value={amount} onChange={(e) => setAmount(e.target.value)}
+          className="w-full h-10 px-3 rounded-[4px] border border-line text-[13.5px] text-ink" />
+      </div>
+      <div>
+        <label className="text-[12px] text-inksoft mb-1 block">Delivery time (days)</label>
+        <input required type="number" value={days} onChange={(e) => setDays(e.target.value)}
+          className="w-full h-10 px-3 rounded-[4px] border border-line text-[13.5px] text-ink" />
+      </div>
+      <div>
+        <label className="text-[12px] text-inksoft mb-1 block">Short pitch</label>
+        <textarea value={pitch} onChange={(e) => setPitch(e.target.value)} rows={2} placeholder="Why you're a good fit…"
+          className="w-full px-3 py-2 rounded-[4px] border border-line text-[13.5px] text-ink resize-none" />
+      </div>
+      <div className="flex gap-2">
+        <button type="submit" disabled={submitting} className="btn-press flex-1 bg-ink text-paper hover:bg-accent font-medium text-[13.5px] px-4 py-2.5 rounded-[4px] disabled:opacity-50">
+          {submitting ? "Sending…" : "Send Offer"}
+        </button>
+        <button type="button" onClick={() => setShowForm(false)} className="btn-press border border-line text-ink text-[13.5px] px-4 py-2.5 rounded-[4px]">
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+function DeleteButton({ project, router, supabase }) {
+  const [user, setUser] = useState(undefined);
+  const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUser(data?.user || null));
+  }, []);
+
+  if (!user || user.id !== project.owner_id) return null;
+
+  async function handleDelete() {
+    setDeleting(true);
+    await supabase.from("projects").delete().eq("id", project.id);
+    router.push("/dashboard");
+  }
+
+  if (confirming) {
+    return (
+      <div className="border border-red-300 rounded-[6px] bg-red-50 p-4 text-center">
+        <p className="text-[13px] text-red-700 mb-3">Delete this project? This can't be undone.</p>
+        <div className="flex gap-2 justify-center">
+          <button onClick={handleDelete} disabled={deleting}
+            className="btn-press bg-red-600 text-white text-[13px] font-medium px-4 py-2 rounded-[4px] disabled:opacity-50">
+            {deleting ? "Deleting…" : "Yes, delete"}
+          </button>
+                  <button onClick={() => setConfirming(false)}
+            className="btn-press bg-emerald-600 text-white text-[13px] font-medium px-4 py-2 rounded-[4px] hover:bg-emerald-700">
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <button onClick={() => setConfirming(true)} className="w-full text-[12.5px] text-inksoft hover:text-red-600 underline">
+      Delete this project
+    </button>
+  );
+}
+function OffersList({ project, router, supabase }) {
+  const [user, setUser] = useState(undefined);
+  const [offers, setOffers] = useState([]);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUser(data?.user || null));
+  }, []);
+
+  useEffect(() => {
+    if (!user || user.id !== project.owner_id) return;
+    supabase
+      .from("offers")
+      .select("*, profiles(display_name, avatar_url, rating_sum, rating_count, specialty)")
+      .eq("project_id", project.id)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => setOffers(data || []));
+  }, [user]);
+
+  if (!user || user.id !== project.owner_id) return null;
+  if (offers.length === 0) return null;
+
+  async function updateStatus(offerId, status) {
+    await supabase.from("offers").update({ status }).eq("id", offerId);
+    setOffers((cur) => cur.map((o) => (o.id === offerId ? { ...o, status } : o)));
+  }
+
+  async function startChat(agentId) {
+    const { data: existing } = await supabase
+      .from("threads")
+      .select("id")
+      .eq("project_id", project.id)
+      .eq("helper_id", agentId)
+      .maybeSingle();
+    if (existing) {
+      router.push(`/messages/${existing.id}`);
+      return;
+    }
+    const { data } = await supabase
+      .from("threads")
+      .insert({ project_id: project.id, owner_id: project.owner_id, helper_id: agentId })
+      .select()
+      .single();
+    if (data) router.push(`/messages/${data.id}`);
+  }
+
+  return (
+    <div className="border border-line rounded-[6px] bg-surface p-4 space-y-3">
+      <h3 className="font-display font-bold text-[14px] text-ink">Offers ({offers.length})</h3>
+      {offers.map((o) => {
+        const rating = o.profiles?.rating_count ? (o.profiles.rating_sum / o.profiles.rating_count).toFixed(1) : null;
+        return (
+          <div key={o.id} className="border border-line rounded-[4px] p-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <Avatar tag={initials(o.profiles?.display_name || "Agent")} size={26} src={o.profiles?.avatar_url} />
+              <div className="min-w-0 flex-1">
+                <div className="text-[13px] font-medium text-ink truncate">{o.profiles?.display_name}</div>
+                {o.profiles?.specialty && <div className="text-[11px] text-inksoft truncate">{o.profiles.specialty}</div>}
+              </div>
+              {rating && <div className="text-[12px] text-ink shrink-0">⭐ {rating}</div>}
+            </div>
+            <div className="flex items-center gap-3 text-[13px] font-mono text-ink">
+              <span>৳{o.amount}</span>
+              <span className="text-inksoft">·</span>
+              <span>{o.delivery_days}d</span>
+            </div>
+            {o.pitch && <p className="text-[12.5px] text-inksoft leading-relaxed">{o.pitch}</p>}
+
+            {o.status === "pending" && (
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => { updateStatus(o.id, "shortlisted"); startChat(o.agent_id); }}
+                  className="btn-press flex-1 bg-ink text-paper text-[12.5px] font-medium px-3 py-1.5 rounded-[4px] hover:bg-accent">
+                  Shortlist &amp; Chat
+                </button>
+                <button onClick={() => updateStatus(o.id, "declined")}
+                  className="btn-press border border-line text-inksoft text-[12.5px] px-3 py-1.5 rounded-[4px] hover:text-ink">
+                  Decline
+                </button>
+              </div>
+            )}
+            {o.status === "shortlisted" && (
+              <button onClick={() => startChat(o.agent_id)}
+                className="btn-press w-full bg-ink text-paper text-[12.5px] font-medium px-3 py-1.5 rounded-[4px] hover:bg-accent">
+                💬 Open Chat
+              </button>
+            )}
+            {o.status === "declined" && (
+              <div className="text-[11.5px] text-inksoft">Declined</div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

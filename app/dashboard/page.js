@@ -57,7 +57,7 @@ export default function DashboardPage() {
           <div>
             <h1 className="font-display font-extrabold text-[22px] text-ink">
               {profile.display_name}'s dashboard
-              <span className="ml-2.5 align-middle text-[11px] font-mono font-normal text-inksoft border border-line rounded-full px-2 py-0.5">
+                           <span className={`ml-2.5 align-middle text-[11px] font-mono font-normal rounded-full px-2 py-0.5 border ${isAgentMode ? "border-[var(--amber)] text-[var(--amber)]" : "border-accent text-accent"}`}>
                 {isAgentMode ? "Agent view" : "Client view"}
               </span>
             </h1>
@@ -72,21 +72,18 @@ export default function DashboardPage() {
       {isAgentMode ? (
         <>
           {/* AGENT MODE */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
-            <div className="border border-line rounded-[6px] bg-surface p-5">
-              <IconStar size={16} className="text-inksoft mb-4" />
-              <div className="font-display font-extrabold text-[22px] text-ink">{rating}</div>
-              <div className="text-[12px] text-inksoft mt-1">Rating</div>
+                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+            <div className="dim-stat border border-line rounded-[6px] bg-surface p-5 pt-6">
+              <div className="dim-stat-num text-[22px] text-ink">{rating}</div>
+              <div className="dim-stat-label text-[12px] mt-1">Rating</div>
             </div>
-            <div className="border border-line rounded-[6px] bg-surface p-5">
-              <IconCheck size={16} className="text-inksoft mb-4" />
-              <div className="font-display font-extrabold text-[22px] text-ink">{profile.completed_count}</div>
-              <div className="text-[12px] text-inksoft mt-1">Projects Completed</div>
+            <div className="dim-stat border border-line rounded-[6px] bg-surface p-5 pt-6">
+              <div className="dim-stat-num text-[22px] text-ink">{profile.completed_count}</div>
+              <div className="dim-stat-label text-[12px] mt-1">Projects Completed</div>
             </div>
-            <div className="border border-line rounded-[6px] bg-surface p-5">
-              <IconBriefcase size={16} className="text-inksoft mb-4" />
-              <div className="font-display font-extrabold text-[22px] text-ink">{myDeals.length}</div>
-              <div className="text-[12px] text-inksoft mt-1">Total Deals</div>
+            <div className="dim-stat border border-line rounded-[6px] bg-surface p-5 pt-6">
+              <div className="dim-stat-num text-[22px] text-ink">{myDeals.length}</div>
+              <div className="dim-stat-label text-[12px] mt-1">Total Deals</div>
             </div>
           </div>
 
@@ -117,7 +114,7 @@ export default function DashboardPage() {
               {portfolio.map((item) => {
                 const imgUrl = item.image_path ? supabase.storage.from("project-files").getPublicUrl(item.image_path).data.publicUrl : null;
                 return (
-                  <div key={item.id} className="border border-line rounded-[6px] bg-surface overflow-hidden">
+                                    <div key={item.id} className="tick card-lift border border-line rounded-[6px] bg-surface overflow-hidden">
                     {imgUrl && <img src={imgUrl} alt={item.title} className="w-full h-32 object-cover" />}
                     <div className="p-4">
                       <h3 className="font-display font-semibold text-[14px] text-ink">{item.title}</h3>
@@ -131,16 +128,14 @@ export default function DashboardPage() {
       ) : (
         <>
           {/* CLIENT MODE */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
-            <div className="border border-line rounded-[6px] bg-surface p-5">
-              <IconBriefcase size={16} className="text-inksoft mb-4" />
-              <div className="font-display font-extrabold text-[22px] text-ink">{myProjects.length}</div>
-              <div className="text-[12px] text-inksoft mt-1">Projects Posted</div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+            <div className="dim-stat border border-line rounded-[6px] bg-surface p-5 pt-6">
+              <div className="dim-stat-num text-[22px] text-ink">{myProjects.length}</div>
+              <div className="dim-stat-label text-[12px] mt-1">Projects Posted</div>
             </div>
-            <div className="border border-line rounded-[6px] bg-surface p-5">
-              <IconCheck size={16} className="text-inksoft mb-4" />
-              <div className="font-display font-extrabold text-[22px] text-ink">{profile.completed_count}</div>
-              <div className="text-[12px] text-inksoft mt-1">Projects Completed</div>
+            <div className="dim-stat border border-line rounded-[6px] bg-surface p-5 pt-6">
+              <div className="dim-stat-num text-[22px] text-ink">{profile.completed_count}</div>
+              <div className="dim-stat-label text-[12px] mt-1">Projects Completed</div>
             </div>
           </div>
 
@@ -150,7 +145,7 @@ export default function DashboardPage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {myProjects.map((p) => (
-                <a key={p.id} href={`/projects/${p.id}`} className="border border-line rounded-[6px] bg-surface p-5 block hover:border-accent transition-colors">
+                                                <a key={p.id} href={`/projects/${p.id}`} className="tick card-lift border border-line rounded-[6px] bg-surface p-5 block">
                   <div className="flex items-center gap-2 mb-3">
                     <Pill>{p.category}</Pill>
                     <StatusBadge status={p.status} />
