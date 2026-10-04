@@ -222,12 +222,12 @@ export default function ChatDetailPage() {
   const otherHasAgentProfile = otherProfile?.specialty || (otherProfile?.skills || []).length > 0 || otherProfile?.rating_count > 0;
 
   return (
-    <div className="w-full px-5 md:px-8 py-8">
+    <div className="w-full px-5 md:px-8 py-8 overflow-x-hidden">
       <button onClick={() => router.push("/messages")} className="lg:hidden inline-flex items-center gap-2 text-[13.5px] text-inksoft hover:text-ink mb-6">
         <IconArrowLeft size={15} /> Back to messages
       </button>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr_260px] gap-5 h-[calc(100vh-180px)]">
+        <div className="border border-line rounded-[6px] bg-surface flex flex-col overflow-hidden h-[calc(100vh-180px)] min-w-0">
 
         {/* Left: conversation list, desktop only */}
         <div className="hidden lg:flex flex-col border border-line rounded-[6px] bg-surface overflow-hidden">
@@ -400,7 +400,7 @@ export default function ChatDetailPage() {
               }}
               onKeyDown={(e) => e.key === "Enter" && sendMessage()}
               placeholder="Write a message…"
-              className="flex-1 h-11 px-4 rounded-[4px] border border-line text-[13.5px] text-ink placeholder:text-inksoft/70"
+              className="flex-1 min-w-0 h-11 px-4 rounded-[4px] border border-line text-[13.5px] text-ink placeholder:text-inksoft/70"
             />
             <button onClick={sendMessage} className="btn-press w-11 h-11 rounded-[4px] bg-ink text-paper hover:bg-accent flex items-center justify-center shrink-0">
               →
