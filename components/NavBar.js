@@ -1,9 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "../lib/supabase/client";
-import { Avatar, PrimaryButton, IconPlus, IconMenu, IconX, initials } from "./ui";
+import { Avatar, PrimaryButton, IconPlus, IconMenu, IconX, IconBell, IconChat, initials } from "./ui";
+import Link from "next/link";
 
 export default function NavBar() {
   const supabase = createClient();
@@ -12,6 +12,9 @@ export default function NavBar() {
   const [profile, setProfile] = useState(null); // our own "profiles" row for that user
   const [mobileOpen, setMobileOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [notifications, setNotifications] = useState([]);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifUnread, setNotifUnread] = useState(0);
 
   useEffect(() => {
     // Ask Supabase "who is logged in right now?" once on load...
@@ -43,6 +46,50 @@ export default function NavBar() {
     const interval = setInterval(checkUnread, 8000);
     return () => clearInterval(interval);
   }, [user]);
+    useEffect(() => {
+    if (!user) { setNotifications([]); setNotifUnread(0); return; }
+    const loadNotifs = () => {
+      supabase
+        .from("notifications")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(20)
+        .then(({ data }) => {
+          setNotifications(data || []);
+          setNotifUnread((data || []).filter((n) => !n.read_at).length);
+        });
+    };
+    loadNotifs();
+    const interval = setInterval(loadNotifs, 10000);
+    return () => clearInterval(interval);
+  }, [user]);
+
+  async function openNotif(n) {
+    if (!n.read_at) {
+      await supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("id", n.id);
+      setNotifications((cur) => cur.map((x) => (x.id === n.id ? { ...x, read_at: new Date().toISOString() } : x)));
+      setNotifUnread((c) => Math.max(0, c - 1));
+    }
+    setNotifOpen(false);
+    router.push(n.link || "/");
+  }
+
+  async function markAllRead() {
+    const unreadIds = notifications.filter((n) => !n.read_at).map((n) => n.id);
+    if (unreadIds.length === 0) return;
+    await supabase.from("notifications").update({ read_at: new Date().toISOString() }).in("id", unreadIds);
+    setNotifications((cur) => cur.map((n) => ({ ...n, read_at: n.read_at || new Date().toISOString() })));
+    setNotifUnread(0);
+  }
+
+  const timeAgo = (ts) => {
+    const diff = Math.floor((Date.now() - new Date(ts).getTime()) / 1000);
+    if (diff < 60) return "just now";
+    if (diff < 3600) return Math.floor(diff / 60) + "m ago";
+    if (diff < 86400) return Math.floor(diff / 3600) + "h ago";
+    return Math.floor(diff / 86400) + "d ago";
+  };
 
   const logout = async () => {
     await supabase.auth.signOut();
@@ -85,14 +132,53 @@ export default function NavBar() {
               )}
                             <Link href="/agents" className="text-[14px] text-inksoft hover:text-ink">Find Agents</Link>
               <Link href="/dashboard" className="text-[14px] text-inksoft hover:text-ink">Dashboard</Link>
-              <Link href="/messages" className="relative text-[14px] text-inksoft hover:text-ink">
-                Messages
+              <Link href="/messages" className="relative text-inksoft hover:text-ink p-1" title="Messages" aria-label="Messages">
+                <IconChat size={19} />
                 {unreadCount > 0 && (
-                  <span className="absolute -top-1.5 -right-2.5 bg-accent text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 bg-accent text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
                     {unreadCount > 9 ? "9+" : unreadCount}
                   </span>
                 )}
               </Link>
+                            <div className="relative">
+                <button onClick={() => setNotifOpen((o) => !o)} className="relative text-inksoft hover:text-ink p-1" title="Notifications" aria-label="Notifications">
+                  <IconBell size={19} />
+                  {notifUnread > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-accent text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                      {notifUnread > 9 ? "9+" : notifUnread}
+                    </span>
+                  )}
+                </button>
+                {notifOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-80 max-h-96 overflow-y-auto bg-surface border border-line rounded-[6px] shadow-2xl z-50">
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-line sticky top-0 bg-surface">
+                      <span className="text-[13px] font-medium text-ink">Notifications</span>
+                      {notifUnread > 0 && (
+                        <button onClick={markAllRead} className="text-[11.5px] text-accent hover:underline">Mark all read</button>
+                      )}
+                    </div>
+                    {notifications.length === 0 ? (
+                      <p className="text-[13px] text-inksoft text-center py-8">No notifications yet.</p>
+                    ) : (
+                      notifications.map((n) => (
+                        <button
+                          key={n.id}
+                          onClick={() => openNotif(n)}
+                          className={`w-full text-left px-4 py-3 border-b border-line last:border-b-0 hover:bg-paperdim/60 ${!n.read_at ? "bg-accent/5" : ""}`}
+                        >
+                          <div className="flex items-start gap-2">
+                            {!n.read_at && <span className="w-1.5 h-1.5 rounded-full bg-accent mt-1.5 shrink-0"></span>}
+                            <div className="min-w-0">
+                              <p className="text-[12.5px] text-ink leading-snug">{n.message}</p>
+                              <p className="text-[10.5px] text-inksoft mt-1">{timeAgo(n.created_at)}</p>
+                            </div>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
                           <Link href="/profile">
                 <Avatar tag={profile ? initials(profile.display_name) : "?"} size={36} src={profile?.avatar_url} />
               </Link>
@@ -106,7 +192,7 @@ export default function NavBar() {
           )}
         </nav>
 
-        <button className="md:hidden text-ink" onClick={() => setMobileOpen(!mobileOpen)}>
+               <button className="md:hidden text-ink" onClick={() => setMobileOpen(!mobileOpen)} aria-label={mobileOpen ? "Close menu" : "Open menu"}>
           {mobileOpen ? <IconX /> : <IconMenu />}
         </button>
       </div>

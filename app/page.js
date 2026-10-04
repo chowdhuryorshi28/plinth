@@ -17,10 +17,10 @@ function ProjectCard({ p }) {
           {new Date(p.created_at).toLocaleDateString()}
         </span>
       </div>
-      <h3 className="font-display font-bold text-[17px] leading-snug text-ink">{p.title}</h3>
-      <p className="text-[13.5px] text-inksoft leading-relaxed line-clamp-3">{p.description}</p>
-      <div className="flex items-center gap-2 pt-1">
-                <Avatar tag={initials(p.owner_name)} size={22} src={p.owner_avatar} />
+           <h3 className="font-display font-bold text-[17px] leading-snug text-ink break-words">{p.title}</h3>
+      <p className="text-[13.5px] text-inksoft leading-relaxed line-clamp-3 break-words">{p.description}</p>
+           <div className="flex items-center gap-2 pt-1">
+        <Avatar tag={initials(p.owner_name)} size={22} src={p.owner_avatar} />
         <span className="text-[13px] text-ink font-medium">{p.owner_name}</span>
       </div>
       <div className="mt-auto pt-3 border-t border-line grid grid-cols-2 gap-3">
@@ -33,8 +33,8 @@ function ProjectCard({ p }) {
           <div className="text-[13px] font-mono font-semibold text-accent">{money(p.budget)}</div>
         </div>
       </div>
-          <span className="inline-flex items-center gap-1.5 text-[13.5px] font-medium text-ink hover:text-accent">
-        View Project →
+               <span className="inline-flex items-center gap-1.5 text-[13.5px] font-medium text-ink hover:text-accent">
+        View Project <span aria-hidden="true">→</span>
       </span>
     </Link>
   );
@@ -87,10 +87,10 @@ export default function FeedPage() {
             <div className="crop-tl"></div>
             <div className="crop-br"></div>
                       <div className="max-w-2xl relative z-10">
-              <span className="inline-flex items-center gap-2 font-mono text-[12px] text-accent border border-accent bg-accent/10 px-2.5 py-1 rounded-full mb-7">
-                <span className="w-1.5 h-1.5 rounded-full bg-accent"></span> Open for new projects
+                            <span className="inline-flex items-center gap-2 font-mono text-[12px] text-accent border border-accent bg-accent/10 px-2.5 py-1 rounded-full mb-7">
+                <span className="w-1.5 h-1.5 rounded-full bg-accent" aria-hidden="true"></span> Open for new projects
               </span>
-              <h1 className="font-display font-extrabold text-[38px] leading-[1.08] md:text-[56px] md:leading-[1.05] text-ink">
+                            <h1 className="font-display font-extrabold text-[38px] leading-[1.08] md:text-[56px] md:leading-[1.05] text-ink text-balance break-words">
                 Deadlines are knocking at the door?
               </h1>
               <p className="mt-5 text-[16px] md:text-[18px] text-inksoft leading-relaxed max-w-xl">
@@ -99,7 +99,8 @@ export default function FeedPage() {
               <div className="mt-8 flex flex-col sm:flex-row gap-3 max-w-xl">
                               <div className="relative flex-1">
                 <IconSearch size={17} className="absolute left-4 top-1/2 -translate-y-1/2 text-black" />
-                <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="What do you need help with?"
+                               <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="What do you need help with?"
+                  name="search" autoComplete="off" aria-label="Search projects"
                   className="w-full h-12 pl-11 pr-4 rounded-[4px] border border-line text-black placeholder:text-black/50 text-[14.5px] bg-white" />
               </div>
               </div>

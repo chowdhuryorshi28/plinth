@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "../../../lib/supabase/client";
 import { Avatar, Pill, money, initials, IconArrowLeft, IconCheck, StatusBadge } from "../../../components/ui";
+import { startOrOpenThread } from "../../../lib/chat";
 
 export default function ProjectDetailPage() {
   const { id } = useParams();
@@ -39,7 +40,7 @@ export default function ProjectDetailPage() {
         <Pill>{p.category}</Pill>
         <StatusBadge status={p.status} />
       </div>
-      <h1 className="font-display font-extrabold text-[28px] md:text-[34px] text-ink leading-tight max-w-2xl">{p.title}</h1>
+           <h1 className="font-display font-extrabold text-[28px] md:text-[34px] text-ink leading-tight max-w-2xl text-balance break-words">{p.title}</h1>
       <div className="flex items-center gap-3 mt-4 mb-10">
               <Avatar tag={initials(ownerName)} size={30} src={p.profiles?.avatar_url} />
         <div>
@@ -52,7 +53,7 @@ export default function ProjectDetailPage() {
         <div className="lg:col-span-2 space-y-10">
           <div>
             <h2 className="font-display font-bold text-[15px] text-ink mb-3">Project description</h2>
-            <p className="text-[14.5px] text-inksoft leading-relaxed">{p.description}</p>
+                        <p className="text-[14.5px] text-inksoft leading-relaxed break-words">{p.description}</p>
           </div>
           {p.requirements?.length > 0 && (
             <div>
@@ -81,11 +82,12 @@ export default function ProjectDetailPage() {
                       rel="noopener noreferrer"
                       className="tick card-lift border border-line rounded-[6px] bg-surface overflow-hidden flex flex-col items-center justify-center text-center h-28"
                     >
-                      {f.file_type?.startsWith("image/") ? (
-                        <img src={data.publicUrl} alt={f.file_name} className="w-full h-full object-cover" />
+                     
+                                            {f.file_type?.startsWith("image/") ? (
+                        <img src={data.publicUrl} alt={f.file_name} width={160} height={112} className="w-full h-full object-cover" />
                       ) : (
                         <>
-                          <span className="text-[20px]">📄</span>
+                          <span className="text-[20px]" aria-hidden="true">📄</span>
                           <span className="text-[12px] text-inksoft truncate w-full px-1 mt-2">{f.file_name}</span>
                         </>
                       )}
@@ -153,27 +155,17 @@ function MessageButtons({ project, ownerName, router, supabase }) {
 
   const isOwner = user.id === project.owner_id;
 
-  async function goToThread() {
+   async function goToThread() {
     if (isOwner) {
       router.push("/messages");
       return;
     }
-    const { data: existing } = await supabase
-      .from("threads")
-      .select("id")
-      .eq("project_id", project.id)
-      .eq("helper_id", user.id)
-      .maybeSingle();
-    if (existing) {
-      router.push(`/messages/${existing.id}`);
-      return;
-    }
-    const { data } = await supabase
-      .from("threads")
-      .insert({ project_id: project.id, owner_id: project.owner_id, helper_id: user.id })
-      .select()
-      .single();
-    router.push(`/messages/${data.id}`);
+    const threadId = await startOrOpenThread(supabase, {
+      currentUserId: user.id,
+      otherUserId: project.owner_id,
+      project,
+    });
+    router.push(`/messages/${threadId}`);
   }
 
   if (isOwner) {
@@ -186,9 +178,6 @@ function MessageButtons({ project, ownerName, router, supabase }) {
 
     return (
     <div className="space-y-2.5">
-      <button onClick={goToThread} className="btn-press w-full bg-ink text-paper hover:bg-accent font-medium text-[14px] px-5 py-2.5 rounded-[4px]">
-        💬 Chat with {ownerName}
-      </button>
       <OfferForm project={project} user={user} supabase={supabase} />
     </div>
   );
@@ -228,7 +217,16 @@ function OfferForm({ project, user, supabase }) {
   }
 
   if (existingOffer === undefined) return null;
+  const router = useRouter();
 
+  async function goToChat() {
+    const threadId = await startOrOpenThread(supabase, {
+      currentUserId: user.id,
+      otherUserId: project.owner_id,
+      project,
+    });
+    router.push(`/messages/${threadId}`);
+  }
   if (existingOffer) {
     const statusLabel = {
       pending: "Offer sent — waiting for a response",
@@ -236,9 +234,15 @@ function OfferForm({ project, user, supabase }) {
       declined: "This offer wasn't selected",
       accepted: "Your offer was accepted 🎉",
     }[existingOffer.status];
+    
     return (
-      <div className="border border-line rounded-[4px] px-4 py-3 text-[13px] text-ink bg-paperdim">
-        {statusLabel} — ৳{existingOffer.amount}, {existingOffer.delivery_days} day{existingOffer.delivery_days > 1 ? "s" : ""}
+      <div className="border border-line rounded-[4px] px-4 py-3 text-[13px] text-ink bg-paperdim space-y-2">
+        <div>{statusLabel} — ৳{existingOffer.amount}, {existingOffer.delivery_days} day{existingOffer.delivery_days > 1 ? "s" : ""}</div>
+        {(existingOffer.status === "shortlisted" || existingOffer.status === "accepted") && (
+          <button onClick={goToChat} className="btn-press w-full bg-ink text-paper hover:bg-accent font-medium text-[13px] px-4 py-2 rounded-[4px]">
+            💬 Go to chat
+          </button>
+        )}
       </div>
     );
   }
@@ -255,17 +259,17 @@ function OfferForm({ project, user, supabase }) {
     <form onSubmit={submitOffer} className="border border-line rounded-[6px] bg-surface p-4 space-y-3">
       <div>
         <label className="text-[12px] text-inksoft mb-1 block">Your price (৳)</label>
-        <input required type="number" value={amount} onChange={(e) => setAmount(e.target.value)}
+                <input required type="number" name="offerAmount" value={amount} onChange={(e) => setAmount(e.target.value)}
           className="w-full h-10 px-3 rounded-[4px] border border-line text-[13.5px] text-ink" />
       </div>
       <div>
         <label className="text-[12px] text-inksoft mb-1 block">Delivery time (days)</label>
-        <input required type="number" value={days} onChange={(e) => setDays(e.target.value)}
+        <input required type="number" name="offerDeliveryDays" value={days} onChange={(e) => setDays(e.target.value)}
           className="w-full h-10 px-3 rounded-[4px] border border-line text-[13.5px] text-ink" />
       </div>
       <div>
         <label className="text-[12px] text-inksoft mb-1 block">Short pitch</label>
-        <textarea value={pitch} onChange={(e) => setPitch(e.target.value)} rows={2} placeholder="Why you're a good fit…"
+        <textarea name="offerPitch" value={pitch} onChange={(e) => setPitch(e.target.value)} rows={2} placeholder="Why you're a good fit…"
           className="w-full px-3 py-2 rounded-[4px] border border-line text-[13.5px] text-ink resize-none" />
       </div>
       <div className="flex gap-2">
@@ -346,23 +350,13 @@ function OffersList({ project, router, supabase }) {
     setOffers((cur) => cur.map((o) => (o.id === offerId ? { ...o, status } : o)));
   }
 
-  async function startChat(agentId) {
-    const { data: existing } = await supabase
-      .from("threads")
-      .select("id")
-      .eq("project_id", project.id)
-      .eq("helper_id", agentId)
-      .maybeSingle();
-    if (existing) {
-      router.push(`/messages/${existing.id}`);
-      return;
-    }
-    const { data } = await supabase
-      .from("threads")
-      .insert({ project_id: project.id, owner_id: project.owner_id, helper_id: agentId })
-      .select()
-      .single();
-    if (data) router.push(`/messages/${data.id}`);
+   async function startChat(agentId) {
+    const threadId = await startOrOpenThread(supabase, {
+      currentUserId: project.owner_id,
+      otherUserId: agentId,
+      project,
+    });
+    router.push(`/messages/${threadId}`);
   }
 
   return (
@@ -378,14 +372,14 @@ function OffersList({ project, router, supabase }) {
                 <div className="text-[13px] font-medium text-ink truncate">{o.profiles?.display_name}</div>
                 {o.profiles?.specialty && <div className="text-[11px] text-inksoft truncate">{o.profiles.specialty}</div>}
               </div>
-              {rating && <div className="text-[12px] text-ink shrink-0">⭐ {rating}</div>}
+                            {rating && <div className="text-[12px] text-ink shrink-0"><span aria-hidden="true">⭐</span> {rating}</div>}
             </div>
             <div className="flex items-center gap-3 text-[13px] font-mono text-ink">
               <span>৳{o.amount}</span>
               <span className="text-inksoft">·</span>
               <span>{o.delivery_days}d</span>
             </div>
-            {o.pitch && <p className="text-[12.5px] text-inksoft leading-relaxed">{o.pitch}</p>}
+                       {o.pitch && <p className="text-[12.5px] text-inksoft leading-relaxed line-clamp-3 break-words">{o.pitch}</p>}
 
             {o.status === "pending" && (
               <div className="flex gap-2 pt-1">
@@ -402,7 +396,7 @@ function OffersList({ project, router, supabase }) {
             {o.status === "shortlisted" && (
               <button onClick={() => startChat(o.agent_id)}
                 className="btn-press w-full bg-ink text-paper text-[12.5px] font-medium px-3 py-1.5 rounded-[4px] hover:bg-accent">
-                💬 Open Chat
+                                <span aria-hidden="true">💬</span> Open Chat
               </button>
             )}
             {o.status === "declined" && (

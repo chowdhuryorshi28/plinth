@@ -34,11 +34,13 @@ export function makeAgentCode() {
 
 export function Avatar({ tag, size = 36, src }) {
   const hue = (tag.charCodeAt(0) * 37 + (tag.charCodeAt(1) || 0) * 17) % 360;
-  if (src) {
+   if (src) {
     return (
       <img
         src={src}
         alt={tag}
+        width={size}
+        height={size}
         style={{ width: size, height: size }}
         className="rounded-full object-cover shrink-0 border border-line"
       />
@@ -86,7 +88,8 @@ export function SecondaryButton({ children, onClick, className = "", disabled })
 export function Icon({ children, size = 18, strokeWidth = 1.6, className = "" }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" className={className}
+      aria-hidden="true" focusable="false">
       {children}
     </svg>
   );
@@ -114,3 +117,10 @@ export const IconStar = (p) => <Icon {...p}><path d="M12 3.5l2.6 5.6 6 .7-4.4 4.
 export const IconDot = (p) => <Icon {...p}><circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none" /></Icon>;
 export const IconMenu = (p) => <Icon {...p}><path d="M3 6h18" /><path d="M3 12h18" /><path d="M3 18h18" /></Icon>;
 export const IconX = (p) => <Icon {...p}><path d="M18 6 6 18" /><path d="M6 6l12 12" /></Icon>;
+export const IconBell = (p) => <Icon {...p}><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></Icon>;
+export const IconChat = (p) => (
+  <Icon {...p}>
+    <rect x="3" y="5" width="18" height="14" rx="2" />
+    <path d="M3 7l9 6 9-6" />
+  </Icon>
+);

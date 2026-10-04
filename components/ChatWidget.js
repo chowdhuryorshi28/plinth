@@ -1,20 +1,24 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { createClient } from "../lib/supabase/client";
-import { Avatar, initials } from "./ui";
+import { Avatar, initials, money } from "./ui";
 
 export default function ChatWidget() {
   const supabase = createClient();
   const router = useRouter();
+  const pathname = usePathname();
   const [user, setUser] = useState(undefined);
   const [open, setOpen] = useState(false);
   const [threads, setThreads] = useState([]);
   const [activeThread, setActiveThread] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [deal, setDeal] = useState(null);
+  const [dealProjectTitle, setDealProjectTitle] = useState("");
   const [text, setText] = useState("");
   const [otherTyping, setOtherTyping] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [projectCards, setProjectCards] = useState({});
 
   const bottomRef = useRef(null);
   const channelRef = useRef(null);
@@ -25,7 +29,6 @@ export default function ChatWidget() {
     supabase.auth.getUser().then(({ data }) => setUser(data?.user || null));
   }, []);
 
-  // unread badge, checked periodically
   useEffect(() => {
     if (!user) return;
     const check = () => {
@@ -38,18 +41,16 @@ export default function ChatWidget() {
     return () => clearInterval(interval);
   }, [user]);
 
-  // load thread list when panel opens
   useEffect(() => {
     if (!open || !user || activeThread) return;
     supabase
       .from("threads")
-            .select(`*, owner:profiles!threads_owner_id_fkey(display_name, avatar_url), helper:profiles!threads_helper_id_fkey(display_name, avatar_url), projects(title)`)
+      .select(`*, owner:profiles!threads_owner_id_fkey(display_name, avatar_url), helper:profiles!threads_helper_id_fkey(display_name, avatar_url), projects(title)`)
       .or(`owner_id.eq.${user.id},helper_id.eq.${user.id}`)
       .order("created_at", { ascending: false })
       .then(({ data }) => setThreads(data || []));
   }, [open, user, activeThread]);
 
-  // active thread: messages + realtime + typing
   useEffect(() => {
     if (!activeThread || !user) return;
 
@@ -58,7 +59,19 @@ export default function ChatWidget() {
         .order("created_at", { ascending: true })
         .then(({ data }) => setMessages(data || []));
     };
+    const loadDeal = () => {
+      supabase.from("deals").select("*").eq("thread_id", activeThread.id).maybeSingle()
+        .then(({ data }) => {
+          setDeal(data || null);
+          if (data) {
+            supabase.from("projects").select("title").eq("id", data.project_id).single()
+              .then(({ data: proj }) => setDealProjectTitle(proj?.title || ""));
+          }
+        });
+    };
+
     loadMessages();
+    loadDeal();
     supabase.from("messages").update({ read_at: new Date().toISOString() })
       .eq("thread_id", activeThread.id).neq("sender_id", user.id).is("read_at", null)
       .then(() => {});
@@ -83,8 +96,32 @@ export default function ChatWidget() {
       .subscribe();
     channelRef.current = channel;
 
-    return () => supabase.removeChannel(channel);
+    const dealInterval = setInterval(loadDeal, 6000);
+
+    return () => {
+      supabase.removeChannel(channel);
+      clearInterval(dealInterval);
+    };
   }, [activeThread, user]);
+
+  useEffect(() => {
+    if (!activeThread) return;
+    const missingIds = [...new Set(messages.filter((m) => m.project_id).map((m) => m.project_id))]
+      .filter((id) => !projectCards[id]);
+    if (missingIds.length === 0) return;
+
+    (async () => {
+      for (const pid of missingIds) {
+        const { data: proj } = await supabase.from("projects").select("id, title, category, budget, deadline, owner_id").eq("id", pid).single();
+        if (!proj) continue;
+        const { data: file } = await supabase.from("project_files").select("file_path").eq("project_id", pid).limit(1).maybeSingle();
+        const imageUrl = file ? supabase.storage.from("project-files").getPublicUrl(file.file_path).data.publicUrl : null;
+        const agentId = proj.owner_id === activeThread.owner_id ? activeThread.helper_id : activeThread.owner_id;
+        const { data: offer } = await supabase.from("offers").select("*").eq("project_id", pid).eq("agent_id", agentId).maybeSingle();
+        setProjectCards((cur) => ({ ...cur, [pid]: { ...proj, imageUrl, offer: offer || null } }));
+      }
+    })();
+  }, [messages, activeThread]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -103,34 +140,65 @@ export default function ChatWidget() {
     const { error } = await supabase.storage.from("project-files").upload(path, file);
     if (!error) {
       await supabase.from("messages").insert({
-        thread_id: activeThread.id,
-        sender_id: user.id,
-        file_path: path,
-        file_name: file.name,
-        file_type: file.type,
+        thread_id: activeThread.id, sender_id: user.id,
+        file_path: path, file_name: file.name, file_type: file.type,
       });
     }
+  }
+
+  async function acceptOfferForCard(card) {
+    if (!card.offer || deal) return;
+    const agentId = card.owner_id === activeThread.owner_id ? activeThread.helper_id : activeThread.owner_id;
+    const { data, error } = await supabase.from("deals").insert({
+      thread_id: activeThread.id, project_id: card.id,
+      owner_id: card.owner_id, helper_id: agentId, amount: card.offer.amount,
+    }).select().single();
+    if (!error) {
+      await supabase.from("threads").update({ status: "deal_accepted" }).eq("id", activeThread.id);
+      await supabase.from("projects").update({ status: "in_progress" }).eq("id", card.id);
+      setDeal(data);
+      setDealProjectTitle(card.title);
+      await supabase.from("offers").update({ status: "accepted" }).eq("id", card.offer.id);
+      await supabase.from("offers").update({ status: "declined" })
+        .eq("project_id", card.id).neq("id", card.offer.id).in("status", ["pending", "shortlisted"]);
+    }
+  }
+
+  async function markComplete() {
+    if (!deal) return;
+    await supabase.from("deals").update({ status: "completed", completed_at: new Date().toISOString() }).eq("id", deal.id);
+    await supabase.from("projects").update({ status: "completed" }).eq("id", deal.project_id);
+    setDeal({ ...deal, status: "completed" });
   }
 
   const fmtTime = (ts) => new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
   if (!user) return null;
+  if (pathname?.startsWith("/messages")) return null;
+
+  const dealIsOwner = deal && user.id === deal.owner_id;
 
   return (
-       <div className="hidden sm:flex fixed bottom-5 right-5 z-50 flex-col items-end">
+    <div className="hidden sm:flex fixed bottom-5 right-5 z-50 flex-col items-end">
       {open && (
-        <div className="mb-3 w-[340px] h-[440px] bg-surface border border-line rounded-[10px] shadow-2xl flex flex-col overflow-hidden">
-          {/* header */}
+        <div className="mb-3 w-[calc(100vw-32px)] max-w-[340px] h-[70vh] max-h-[460px] bg-surface border border-line rounded-[10px] shadow-2xl flex flex-col overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-3 border-b border-line shrink-0 bg-paperdim">
             {activeThread ? (
               <>
                 <button onClick={() => setActiveThread(null)} className="text-inksoft hover:text-ink text-[15px]">←</button>
-                               <Avatar tag={initials(
+                <Avatar tag={initials(
                   (activeThread.owner_id === user.id ? activeThread.helper?.display_name : activeThread.owner?.display_name) || "Agent"
                 )} size={24} src={activeThread.owner_id === user.id ? activeThread.helper?.avatar_url : activeThread.owner?.avatar_url} />
                 <span className="text-[13px] font-medium text-ink truncate">
                   {(activeThread.owner_id === user.id ? activeThread.helper?.display_name : activeThread.owner?.display_name) || "Agent"}
                 </span>
+                <button
+                  onClick={() => router.push(`/messages/${activeThread.id}`)}
+                  className="ml-1 text-[10.5px] text-inksoft hover:text-accent shrink-0"
+                  title="Open full chat"
+                >
+                  ↗
+                </button>
               </>
             ) : (
               <span className="text-[13.5px] font-medium text-ink">Messages</span>
@@ -138,7 +206,6 @@ export default function ChatWidget() {
             <button onClick={() => setOpen(false)} className="ml-auto text-inksoft hover:text-ink text-[15px]">✕</button>
           </div>
 
-          {/* body */}
           {!activeThread ? (
             <div className="flex-1 overflow-y-auto divide-y divide-line">
               {threads.length === 0 && (
@@ -150,10 +217,10 @@ export default function ChatWidget() {
                 return (
                   <button key={t.id} onClick={() => setActiveThread(t)}
                     className="w-full flex items-center gap-2.5 px-4 py-3 text-left hover:bg-paperdim/60">
-                    <Avatar tag={initials(otherName || "Agent")} size={28}  src={otherAvatar}/>
+                    <Avatar tag={initials(otherName || "Agent")} size={28} src={otherAvatar} />
                     <div className="min-w-0">
                       <div className="text-[12.5px] font-medium text-ink truncate">{otherName || "Agent"}</div>
-                      <div className="text-[11px] text-inksoft truncate">{t.projects?.title}</div>
+                      <div className="text-[11px] text-inksoft truncate">{t.projects?.title || "Direct message"}</div>
                     </div>
                   </button>
                 );
@@ -162,13 +229,21 @@ export default function ChatWidget() {
           ) : (
             <>
               <div className="flex-1 overflow-y-auto px-3.5 py-3 space-y-2.5">
-                              {messages.map((m) => {
+                {messages.map((m) => {
                   const mine = m.sender_id === user.id;
                   const fileUrl = m.file_path ? supabase.storage.from("project-files").getPublicUrl(m.file_path).data.publicUrl : null;
                   const isImage = m.file_type?.startsWith("image/");
                   return (
                     <div key={m.id} className={`flex flex-col ${mine ? "items-end" : "items-start"}`}>
-                      {fileUrl ? (
+                      {m.project_id ? (
+                        <ProjectCardMini
+                          card={projectCards[m.project_id]}
+                          currentUserId={user.id}
+                          deal={deal}
+                          onClick={() => router.push(`/projects/${m.project_id}`)}
+                          onAccept={acceptOfferForCard}
+                        />
+                      ) : fileUrl ? (
                         isImage ? (
                           <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="max-w-[75%] rounded-[7px] overflow-hidden border border-line">
                             <img src={fileUrl} alt={m.file_name} className="w-full max-h-40 object-cover" />
@@ -184,7 +259,9 @@ export default function ChatWidget() {
                           {m.content}
                         </div>
                       )}
-                      <span className="text-[9.5px] text-inksoft mt-0.5 px-0.5">{fmtTime(m.created_at)}</span>
+                      {!m.project_id && (
+                        <span className="text-[9.5px] text-inksoft mt-0.5 px-0.5">{fmtTime(m.created_at)}</span>
+                      )}
                     </div>
                   );
                 })}
@@ -193,7 +270,21 @@ export default function ChatWidget() {
                 )}
                 <div ref={bottomRef}></div>
               </div>
-                           <div className="flex items-center gap-1.5 px-3 py-2.5 border-t border-line shrink-0">
+
+              {deal && (
+                <div className="flex items-center justify-between gap-2 px-3.5 py-2 border-t border-line shrink-0 bg-paperdim/60 text-[11.5px]">
+                  <span className="text-ink truncate">
+                    ✓ {money(deal.amount)} · {dealProjectTitle}
+                  </span>
+                  {dealIsOwner && deal.status !== "completed" && (
+                    <button onClick={markComplete} className="shrink-0 text-accent font-medium hover:underline">
+                      Mark Complete
+                    </button>
+                  )}
+                </div>
+              )}
+
+              <div className="flex items-center gap-1.5 px-3 py-2.5 border-t border-line shrink-0">
                 <input
                   type="file"
                   id="widgetFileInput"
@@ -224,7 +315,6 @@ export default function ChatWidget() {
         </div>
       )}
 
-      {/* floating launcher button */}
       <button
         onClick={() => setOpen((o) => !o)}
         className="btn-press relative w-14 h-14 rounded-full bg-ink text-paper flex items-center justify-center text-[22px] shadow-xl hover:bg-accent"
@@ -236,6 +326,43 @@ export default function ChatWidget() {
           </span>
         )}
       </button>
+    </div>
+  );
+}
+
+function ProjectCardMini({ card, currentUserId, deal, onClick, onAccept }) {
+  if (!card) {
+    return <div className="w-56 h-20 rounded-[7px] border border-line bg-paperdim animate-pulse"></div>;
+  }
+  const isOwnerHere = currentUserId === card.owner_id;
+  const dealIsForThisCard = deal && deal.project_id === card.id;
+  const canAccept = isOwnerHere && card.offer && ["pending", "shortlisted"].includes(card.offer.status) && !deal;
+
+  return (
+    <div className="w-56 rounded-[7px] border border-line bg-surface overflow-hidden">
+      <button onClick={onClick} className="text-left w-full block">
+        {card.imageUrl && <img src={card.imageUrl} alt={card.title} className="w-full h-16 object-cover" />}
+        <div className="p-2 space-y-1">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[9.5px] text-inksoft bg-paperdim px-1.5 py-0.5 rounded-[3px] border border-line">{card.category}</span>
+            <span className="text-[11px] font-mono text-accent font-semibold">{money(card.budget)}</span>
+          </div>
+          <h4 className="font-display font-semibold text-[12px] text-ink leading-snug">{card.title}</h4>
+        </div>
+      </button>
+      {dealIsForThisCard && (
+        <div className="px-2 py-1.5 border-t border-line text-[10.5px] text-accent font-medium">
+          {deal.status === "completed" ? "✓ Deal completed" : "✓ Deal accepted"}
+        </div>
+      )}
+      {canAccept && (
+        <button
+          onClick={() => onAccept(card)}
+                   className="w-full bg-ink text-paper hover:bg-accent font-medium text-[11px] px-2 py-2 border-t border-line"
+        >
+          Accept — {money(card.offer.amount)} (10%)
+        </button>
+      )}
     </div>
   );
 }

@@ -18,7 +18,7 @@ export default function MessagesPage() {
     if (!user) return;
     supabase
       .from("threads")
-           .select(`
+      .select(`
         *,
         projects(title, owner_id),
         owner:profiles!threads_owner_id_fkey(display_name, avatar_url),
@@ -28,7 +28,6 @@ export default function MessagesPage() {
       .order("created_at", { ascending: false })
       .then(async ({ data }) => {
         const list = data || [];
-        // attach last message + unread count for each thread
         const withMeta = await Promise.all(
           list.map(async (t) => {
             const { data: lastMsg } = await supabase
@@ -73,7 +72,7 @@ export default function MessagesPage() {
               onClick={() => router.push(`/messages/${t.id}`)}
               className="w-full flex items-center gap-3.5 px-5 py-4 text-left hover:bg-paperdim/60 transition-colors"
             >
-             <Avatar tag={initials(otherName || "Agent")} size={36} src={otherAvatar} />
+              <Avatar tag={initials(otherName || "Agent")} size={36} src={otherAvatar} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-[13.5px] font-medium text-ink">{otherName || "Agent"}</span>
@@ -81,7 +80,9 @@ export default function MessagesPage() {
                     <span className="text-[10.5px] text-accent font-medium">· Deal accepted</span>
                   )}
                 </div>
-                <div className="text-[12px] text-inksoft truncate">{t.projects?.title}</div>
+                <div className="text-[12px] text-inksoft truncate">
+                  {t.projects?.title || "Direct message"}
+                </div>
                 {t.lastMsg && (
                   <div className="text-[12.5px] text-inksoft truncate mt-0.5">{t.lastMsg.content}</div>
                 )}
