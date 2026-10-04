@@ -192,9 +192,31 @@ export default function NavBar() {
           )}
         </nav>
 
-               <button className="md:hidden text-ink" onClick={() => setMobileOpen(!mobileOpen)} aria-label={mobileOpen ? "Close menu" : "Open menu"}>
-          {mobileOpen ? <IconX /> : <IconMenu />}
-        </button>
+        <div className="flex items-center gap-1 md:hidden">
+          {user && (
+            <>
+              <Link href="/messages" className="relative text-ink p-1.5" title="Messages" aria-label="Messages">
+                <IconChat size={20} />
+                {unreadCount > 0 && (
+                  <span className="absolute top-0.5 right-0.5 bg-accent text-white text-[9px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center">
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </span>
+                )}
+              </Link>
+              <Link href="/notifications" className="relative text-ink p-1.5" title="Notifications" aria-label="Notifications">
+                <IconBell size={20} />
+                {notifUnread > 0 && (
+                  <span className="absolute top-0.5 right-0.5 bg-accent text-white text-[9px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center">
+                    {notifUnread > 9 ? "9+" : notifUnread}
+                  </span>
+                )}
+              </Link>
+            </>
+          )}
+          <button className="text-ink p-1.5" onClick={() => setMobileOpen(!mobileOpen)} aria-label={mobileOpen ? "Close menu" : "Open menu"}>
+            {mobileOpen ? <IconX /> : <IconMenu />}
+          </button>
+        </div>
       </div>
 
       {mobileOpen && (
@@ -208,9 +230,9 @@ export default function NavBar() {
               {profile?.current_mode !== "agent" && (
                 <Link href="/post" onClick={() => setMobileOpen(false)}>Post a Project</Link>
               )}
-                            <Link href="/agents" onClick={() => setMobileOpen(false)}>Find Agents</Link>
+              <Link href="/agents" onClick={() => setMobileOpen(false)}>Find Agents</Link>
               <Link href="/dashboard" onClick={() => setMobileOpen(false)}>Dashboard</Link>
-              <Link href="/messages" onClick={() => setMobileOpen(false)}>Messages</Link>
+
               <Link href="/profile" onClick={() => setMobileOpen(false)}>Profile</Link>
               <button onClick={logout} className="text-left text-inksoft">Log out</button>
             </>
