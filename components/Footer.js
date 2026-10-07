@@ -1,4 +1,10 @@
+"use client";
+import { usePathname } from "next/navigation";
+
 export default function Footer() {
+  const pathname = usePathname();
+  if (pathname?.startsWith("/messages")) return null;
+
   return (
     <footer className="border-t border-line mt-16">
       <div className="max-w-7xl mx-auto px-5 md:px-8 py-8 flex flex-col sm:flex-row items-center justify-between gap-4">

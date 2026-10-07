@@ -34,7 +34,7 @@ export function makeAgentCode() {
 
 export function Avatar({ tag, size = 36, src }) {
   const hue = (tag.charCodeAt(0) * 37 + (tag.charCodeAt(1) || 0) * 17) % 360;
-   if (src) {
+  if (src) {
     return (
       <img
         src={src}
@@ -53,6 +53,15 @@ export function Avatar({ tag, size = 36, src }) {
     >
       <span style={{ fontSize: size * 0.36 }}>{tag}</span>
     </div>
+  );
+}
+export function OnlineDot({ online, label = "Active now" }) {
+  if (!online) return null;
+  return (
+    <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 font-medium">
+      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+      {label}
+    </span>
   );
 }
 export function Pill({ children, tone = "default", className = "" }) {

@@ -2,6 +2,7 @@ import "./globals.css";
 import NavBar from "../components/NavBar";
 import Footer from "../components/Footer";
 import ChatWidget from "../components/ChatWidget";
+import { PresenceProvider } from "../lib/presence";
 
 export const metadata = {
   title: "Plinth — Architecture Project Marketplace",
@@ -20,10 +21,12 @@ export default function RootLayout({ children }) {
         />
       </head>
       <body className="min-h-screen flex flex-col font-sans">
-                       <NavBar />
-        <main className="flex-1">{children}</main>
-        <Footer />
-        <ChatWidget />
+        <PresenceProvider>
+          <NavBar />
+          <main className="flex-1">{children}</main>
+          <Footer />
+          <ChatWidget />
+        </PresenceProvider>
       </body>
     </html>
   );

@@ -4,6 +4,18 @@ import { useRouter } from "next/navigation";
 import { createClient } from "../../lib/supabase/client";
 import { Avatar, initials } from "../../components/ui";
 
+function fmtListTime(ts) {
+  if (!ts) return "";
+  const d = new Date(ts);
+  const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  if (sameDay) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const yesterday = new Date();
+  yesterday.setDate(now.getDate() - 1);
+  if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return d.toLocaleDateString([], { day: "numeric", month: "short" });
+}
+
 export default function MessagesPage() {
   const supabase = createClient();
   const router = useRouter();
@@ -25,14 +37,13 @@ export default function MessagesPage() {
         helper:profiles!threads_helper_id_fkey(display_name, avatar_url)
       `)
       .or(`owner_id.eq.${user.id},helper_id.eq.${user.id}`)
-      .order("created_at", { ascending: false })
       .then(async ({ data }) => {
         const list = data || [];
         const withMeta = await Promise.all(
           list.map(async (t) => {
             const { data: lastMsg } = await supabase
               .from("messages")
-              .select("content, created_at")
+              .select("content, created_at, file_name, project_id")
               .eq("thread_id", t.id)
               .order("created_at", { ascending: false })
               .limit(1)
@@ -46,6 +57,11 @@ export default function MessagesPage() {
             return { ...t, lastMsg, unread: unread || 0 };
           })
         );
+        withMeta.sort((a, b) => {
+          const at = a.lastMsg?.created_at || a.created_at;
+          const bt = b.lastMsg?.created_at || b.created_at;
+          return new Date(bt) - new Date(at);
+        });
         setThreads(withMeta);
       });
   }, [user]);
@@ -66,6 +82,10 @@ export default function MessagesPage() {
           const isOwner = t.owner_id === user.id;
           const otherName = isOwner ? t.helper?.display_name : t.owner?.display_name;
           const otherAvatar = isOwner ? t.helper?.avatar_url : t.owner?.avatar_url;
+          const previewText = t.lastMsg
+            ? (t.lastMsg.content || (t.lastMsg.project_id ? "📁 Shared a project" : t.lastMsg.file_name ? "📎 " + t.lastMsg.file_name : ""))
+            : "No messages yet";
+
           return (
             <button
               key={t.id}
@@ -74,18 +94,13 @@ export default function MessagesPage() {
             >
               <Avatar tag={initials(otherName || "Agent")} size={36} src={otherAvatar} />
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-[13.5px] font-medium text-ink">{otherName || "Agent"}</span>
-                  {t.status === "deal_accepted" && (
-                    <span className="text-[10.5px] text-accent font-medium">· Deal accepted</span>
-                  )}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[13.5px] font-medium text-ink truncate">{otherName || "Agent"}</span>
+                  <span className="text-[11px] text-inksoft shrink-0">{fmtListTime(t.lastMsg?.created_at)}</span>
                 </div>
-                <div className="text-[12px] text-inksoft truncate">
-                  {t.projects?.title || "Direct message"}
+                <div className={`text-[12.5px] truncate mt-0.5 ${t.unread > 0 ? "text-ink font-medium" : "text-inksoft"}`}>
+                  {previewText}
                 </div>
-                {t.lastMsg && (
-                  <div className="text-[12.5px] text-inksoft truncate mt-0.5">{t.lastMsg.content}</div>
-                )}
               </div>
               {t.unread > 0 && (
                 <span className="shrink-0 bg-accent text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">

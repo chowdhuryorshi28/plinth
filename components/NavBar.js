@@ -3,11 +3,13 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "../lib/supabase/client";
 import { Avatar, PrimaryButton, IconPlus, IconMenu, IconX, IconBell, IconChat, initials } from "./ui";
+import { useOnline } from "../lib/presence";
 import Link from "next/link";
 
 export default function NavBar() {
   const supabase = createClient();
   const router = useRouter();
+ 
   const [user, setUser] = useState(null);   // the Supabase auth user (or null)
   const [profile, setProfile] = useState(null); // our own "profiles" row for that user
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -15,6 +17,7 @@ export default function NavBar() {
   const [notifications, setNotifications] = useState([]);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifUnread, setNotifUnread] = useState(0);
+  const isOnline = useOnline(user?.id);
 
   useEffect(() => {
     // Ask Supabase "who is logged in right now?" once on load...
@@ -179,8 +182,9 @@ export default function NavBar() {
                   </div>
                 )}
               </div>
-                          <Link href="/profile">
+              <Link href="/profile" className="flex items-center gap-1.5">
                 <Avatar tag={profile ? initials(profile.display_name) : "?"} size={36} src={profile?.avatar_url} />
+                {isOnline && <span className="w-2 h-2 rounded-full bg-emerald-500" title="You're online"></span>}
               </Link>
               <button onClick={logout} className="text-[13px] text-inksoft hover:text-ink">Log out</button>
             </>

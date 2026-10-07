@@ -47,8 +47,27 @@ export default function ChatWidget() {
       .from("threads")
       .select(`*, owner:profiles!threads_owner_id_fkey(display_name, avatar_url), helper:profiles!threads_helper_id_fkey(display_name, avatar_url), projects(title)`)
       .or(`owner_id.eq.${user.id},helper_id.eq.${user.id}`)
-      .order("created_at", { ascending: false })
-      .then(({ data }) => setThreads(data || []));
+      .then(async ({ data }) => {
+        const list = data || [];
+        const withLast = await Promise.all(
+          list.map(async (t) => {
+            const { data: lastMsg } = await supabase
+              .from("messages")
+              .select("content, created_at, file_name, project_id")
+              .eq("thread_id", t.id)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            return { ...t, lastMsg };
+          })
+        );
+        withLast.sort((a, b) => {
+          const at = a.lastMsg?.created_at || a.created_at;
+          const bt = b.lastMsg?.created_at || b.created_at;
+          return new Date(bt) - new Date(at);
+        });
+        setThreads(withLast);
+      });
   }, [open, user, activeThread]);
 
   useEffect(() => {
@@ -170,7 +189,16 @@ export default function ChatWidget() {
     await supabase.from("projects").update({ status: "completed" }).eq("id", deal.project_id);
     setDeal({ ...deal, status: "completed" });
   }
-
+  const fmtListTime = (ts) => {
+    if (!ts) return "";
+    const d = new Date(ts);
+    const now = new Date();
+    if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const yesterday = new Date();
+    yesterday.setDate(now.getDate() - 1);
+    if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
+    return d.toLocaleDateString([], { day: "numeric", month: "short" });
+  };
   const fmtTime = (ts) => new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
   if (!user) return null;
@@ -215,12 +243,17 @@ export default function ChatWidget() {
                 const otherName = t.owner_id === user.id ? t.helper?.display_name : t.owner?.display_name;
                 const otherAvatar = t.owner_id === user.id ? t.helper?.avatar_url : t.owner?.avatar_url;
                 return (
-                  <button key={t.id} onClick={() => setActiveThread(t)}
+                    <button key={t.id} onClick={() => setActiveThread(t)}
                     className="w-full flex items-center gap-2.5 px-4 py-3 text-left hover:bg-paperdim/60">
                     <Avatar tag={initials(otherName || "Agent")} size={28} src={otherAvatar} />
-                    <div className="min-w-0">
-                      <div className="text-[12.5px] font-medium text-ink truncate">{otherName || "Agent"}</div>
-                      <div className="text-[11px] text-inksoft truncate">{t.projects?.title || "Direct message"}</div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-[12.5px] font-medium text-ink truncate">{otherName || "Agent"}</span>
+                        <span className="text-[9.5px] text-inksoft shrink-0">{fmtListTime(t.lastMsg?.created_at)}</span>
+                      </div>
+                      <div className="text-[11px] text-inksoft truncate mt-0.5">
+                        {t.lastMsg ? (t.lastMsg.content || (t.lastMsg.project_id ? "📁 Shared a project" : t.lastMsg.file_name ? "📎 " + t.lastMsg.file_name : "")) : "No messages yet"}
+                      </div>
                     </div>
                   </button>
                 );
