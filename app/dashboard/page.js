@@ -3,6 +3,17 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "../../lib/supabase/client";
 import { Avatar, Pill, money, initials, PrimaryButton, IconPlus, IconBriefcase, IconCheck, IconStar, StatusBadge } from "../../components/ui";
+import { budgetLabel, negotiableLabel } from "../../lib/format";
+
+function PinIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
+      <path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0z" />
+      <circle cx="12" cy="10" r="3" />
+    </svg>
+  );
+}
 
 export default function DashboardPage() {
   const supabase = createClient();
@@ -47,7 +58,7 @@ export default function DashboardPage() {
   }
 
   const isAgentMode = profile.current_mode === "agent";
-  const rating = profile.rating_count ? (profile.rating_sum / profile.rating_count).toFixed(1) : "—";
+  const rating = profile.rating_count ? (profile.rating_sum / profile.rating_count).toFixed(1) : "\u2014";
 
   return (
     <div className="max-w-6xl mx-auto px-5 md:px-8 py-10">
@@ -56,8 +67,8 @@ export default function DashboardPage() {
           <Avatar tag={initials(profile.display_name)} size={44} src={profile.avatar_url} />
           <div>
             <h1 className="font-display font-extrabold text-[22px] text-ink">
-              {profile.display_name}'s dashboard
-                           <span className={`ml-2.5 align-middle text-[11px] font-mono font-normal rounded-full px-2 py-0.5 border ${isAgentMode ? "border-[var(--amber)] text-[var(--amber)]" : "border-accent text-accent"}`}>
+              {profile.display_name}&apos;s dashboard
+              <span className={`ml-2.5 align-middle text-[11px] font-mono font-normal rounded-full px-2 py-0.5 border ${isAgentMode ? "border-[var(--amber)] text-[var(--amber)]" : "border-accent text-accent"}`}>
                 {isAgentMode ? "Agent view" : "Client view"}
               </span>
             </h1>
@@ -72,7 +83,7 @@ export default function DashboardPage() {
       {isAgentMode ? (
         <>
           {/* AGENT MODE */}
-                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
             <div className="dim-stat border border-line rounded-[6px] bg-surface p-5 pt-6">
               <div className="dim-stat-num text-[22px] text-ink">{rating}</div>
               <div className="dim-stat-label text-[12px] mt-1">Rating</div>
@@ -89,7 +100,7 @@ export default function DashboardPage() {
 
           <h2 className="font-display font-bold text-[17px] text-ink mb-4">My Deals</h2>
           {myDeals.length === 0 ? (
-            <p className="text-[14px] text-inksoft mb-10">No deals yet — offer to help on a project to get started.</p>
+            <p className="text-[14px] text-inksoft mb-10">No deals yet &mdash; offer to help on a project to get started.</p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-10">
               {myDeals.map((d) => (
@@ -114,7 +125,7 @@ export default function DashboardPage() {
               {portfolio.map((item) => {
                 const imgUrl = item.image_path ? supabase.storage.from("project-files").getPublicUrl(item.image_path).data.publicUrl : null;
                 return (
-                                    <div key={item.id} className="tick card-lift border border-line rounded-[6px] bg-surface overflow-hidden">
+                  <div key={item.id} className="tick card-lift border border-line rounded-[6px] bg-surface overflow-hidden">
                     {imgUrl && <img src={imgUrl} alt={item.title} className="w-full h-32 object-cover" />}
                     <div className="p-4">
                       <h3 className="font-display font-semibold text-[14px] text-ink">{item.title}</h3>
@@ -128,7 +139,7 @@ export default function DashboardPage() {
       ) : (
         <>
           {/* CLIENT MODE */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
             <div className="dim-stat border border-line rounded-[6px] bg-surface p-5 pt-6">
               <div className="dim-stat-num text-[22px] text-ink">{myProjects.length}</div>
               <div className="dim-stat-label text-[12px] mt-1">Projects Posted</div>
@@ -141,19 +152,35 @@ export default function DashboardPage() {
 
           <h2 className="font-display font-bold text-[17px] text-ink mb-4">My Projects</h2>
           {myProjects.length === 0 ? (
-            <p className="text-[14px] text-inksoft">You haven't posted anything yet.</p>
+            <p className="text-[14px] text-inksoft">You haven&apos;t posted anything yet.</p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {myProjects.map((p) => (
-                                                <a key={p.id} href={`/projects/${p.id}`} className="tick card-lift border border-line rounded-[6px] bg-surface p-5 block">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Pill>{p.category}</Pill>
-                    <StatusBadge status={p.status} />
-                  </div>
-                  <h3 className="font-display font-bold text-[15px] text-ink mb-2">{p.title}</h3>
-                  <div className="text-[13px] font-mono text-accent">{money(p.budget)}</div>
-                </a>
-              ))}
+              {myProjects.map((p) => {
+                const negotiable = negotiableLabel(p);
+                return (
+                  <a key={p.id} href={`/projects/${p.id}`} className="tick card-lift border border-line rounded-[6px] bg-surface p-5 block">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Pill>{p.category}</Pill>
+                      <StatusBadge status={p.status} />
+                    </div>
+                    <h3 className="font-display font-bold text-[15px] text-ink mb-2 break-words">{p.title}</h3>
+                    {p.location && (
+                      <div className="inline-flex items-center gap-1 text-[12px] text-inksoft mb-2">
+                        <PinIcon />
+                        <span>{p.location}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[13px] font-mono text-accent">{budgetLabel(p)}</span>
+                      {negotiable && (
+                        <span className="text-[10.5px] font-medium px-2 py-0.5 rounded-full border border-line text-inksoft">
+                          {negotiable}
+                        </span>
+                      )}
+                    </div>
+                  </a>
+                );
+              })}
             </div>
           )}
         </>

@@ -1,9 +1,10 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "../../../lib/supabase/client";
-import { Avatar, Pill, money, initials, IconArrowLeft, IconCheck, StatusBadge } from "../../../components/ui";
+import { Avatar, Pill, initials, IconArrowLeft, IconCheck, StatusBadge } from "../../../components/ui";
 import { startOrOpenThread } from "../../../lib/chat";
+import { budgetLabel, negotiableLabel } from "../../../lib/format";
 
 export default function ProjectDetailPage() {
   const { id } = useParams();
@@ -14,7 +15,7 @@ export default function ProjectDetailPage() {
 
   useEffect(() => {
     let cancelled = false;
-        supabase.from("projects").select("*, profiles!projects_owner_id_fkey(display_name, agent_code, avatar_url)")
+    supabase.from("projects").select("*, profiles!projects_owner_id_fkey(display_name, agent_code, avatar_url)")
       .eq("id", id).single()
       .then(({ data }) => { if (!cancelled) setP(data || null); });
     return () => { cancelled = true; };
@@ -22,6 +23,7 @@ export default function ProjectDetailPage() {
 
   useEffect(() => {
     supabase.from("project_files").select("*").eq("project_id", id)
+      .order("created_at", { ascending: true })
       .then(({ data }) => setFiles(data || []));
   }, [id]);
 
@@ -29,6 +31,9 @@ export default function ProjectDetailPage() {
   if (p === null) return <div className="max-w-3xl mx-auto px-5 py-16 text-inksoft">Project not found.</div>;
 
   const ownerName = p.profiles?.display_name || "Agent";
+  const imageFiles = files.filter((f) => f.file_type?.startsWith("image/"));
+  const otherFiles = files.filter((f) => !f.file_type?.startsWith("image/"));
+  const negotiable = negotiableLabel(p);
 
   return (
     <div className="max-w-5xl mx-auto px-5 md:px-8 py-10">
@@ -40,9 +45,9 @@ export default function ProjectDetailPage() {
         <Pill>{p.category}</Pill>
         <StatusBadge status={p.status} />
       </div>
-           <h1 className="font-display font-extrabold text-[28px] md:text-[34px] text-ink leading-tight max-w-2xl text-balance break-words">{p.title}</h1>
+      <h1 className="font-display font-extrabold text-[28px] md:text-[34px] text-ink leading-tight max-w-2xl text-balance break-words">{p.title}</h1>
       <div className="flex items-center gap-3 mt-4 mb-10">
-              <Avatar tag={initials(ownerName)} size={30} src={p.profiles?.avatar_url} />
+        <Avatar tag={initials(ownerName)} size={30} src={p.profiles?.avatar_url} />
         <div>
           <div className="text-[13.5px] text-ink font-medium">Posted by {ownerName}</div>
           <div className="text-[12px] text-inksoft">{new Date(p.created_at).toLocaleString()}</div>
@@ -50,10 +55,14 @@ export default function ProjectDetailPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-10">
+        <div className="lg:col-span-2 space-y-10 min-w-0">
+          {imageFiles.length > 0 && (
+            <ProjectGallery images={imageFiles} title={p.title} supabase={supabase} />
+          )}
+
           <div>
             <h2 className="font-display font-bold text-[15px] text-ink mb-3">Project description</h2>
-                        <p className="text-[14.5px] text-inksoft leading-relaxed break-words">{p.description}</p>
+            <p className="text-[14.5px] text-inksoft leading-relaxed break-words">{p.description}</p>
           </div>
           {p.requirements?.length > 0 && (
             <div>
@@ -67,30 +76,22 @@ export default function ProjectDetailPage() {
               </ul>
             </div>
           )}
-          {files.length > 0 && (
+          {otherFiles.length > 0 && (
             <div>
               <h2 className="font-display font-bold text-[15px] text-ink mb-3">Project files</h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {files.map((f) => {
+                {otherFiles.map((f) => {
                   const { data } = supabase.storage.from("project-files").getPublicUrl(f.file_path);
                   return (
                     <a
-                                          
                       key={f.id}
                       href={data.publicUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="tick card-lift border border-line rounded-[6px] bg-surface overflow-hidden flex flex-col items-center justify-center text-center h-28"
                     >
-                     
-                                            {f.file_type?.startsWith("image/") ? (
-                        <img src={data.publicUrl} alt={f.file_name} width={160} height={112} className="w-full h-full object-cover" />
-                      ) : (
-                        <>
-                          <span className="text-[20px]" aria-hidden="true">📄</span>
-                          <span className="text-[12px] text-inksoft truncate w-full px-1 mt-2">{f.file_name}</span>
-                        </>
-                      )}
+                      <span className="text-[20px]" aria-hidden="true">📄</span>
+                      <span className="text-[12px] text-inksoft truncate w-full px-1 mt-2">{f.file_name}</span>
                     </a>
                   );
                 })}
@@ -101,6 +102,15 @@ export default function ProjectDetailPage() {
 
         <aside className="space-y-4">
           <div className="border border-line rounded-[6px] bg-surface p-5 space-y-5">
+            {p.location && (
+              <>
+                <div>
+                  <div className="text-[10.5px] uppercase tracking-wide text-inksoft mb-1">Location</div>
+                  <div className="text-[15px] text-ink">{p.location}</div>
+                </div>
+                <div className="h-px bg-line"></div>
+              </>
+            )}
             <div>
               <div className="text-[10.5px] uppercase tracking-wide text-inksoft mb-1">Deadline</div>
               <div className="text-[15px] font-mono text-ink">{p.deadline}</div>
@@ -113,7 +123,12 @@ export default function ProjectDetailPage() {
             <div className="h-px bg-line"></div>
             <div>
               <div className="text-[10.5px] uppercase tracking-wide text-inksoft mb-1">Budget</div>
-              <div className="text-[22px] font-mono font-bold text-accent">{money(p.budget)}</div>
+              <div className="text-[22px] font-mono font-bold text-accent break-words">{budgetLabel(p)}</div>
+              {negotiable && (
+                <span className="inline-block mt-2 text-[11px] font-medium px-2 py-0.5 rounded-full border border-line text-inksoft">
+                  {negotiable}
+                </span>
+              )}
             </div>
             {p.software?.length > 0 && (
               <>
@@ -137,6 +152,90 @@ export default function ProjectDetailPage() {
   );
 }
 
+function ProjectGallery({ images, title, supabase }) {
+  const scrollRef = useRef(null);
+  const [index, setIndex] = useState(0);
+
+  const slides = images.map((f) => ({
+    id: f.id,
+    url: supabase.storage.from("project-files").getPublicUrl(f.file_path).data.publicUrl,
+  }));
+  const last = slides.length - 1;
+
+  function onScroll() {
+    const el = scrollRef.current;
+    if (!el || el.clientWidth === 0) return;
+    setIndex(Math.round(el.scrollLeft / el.clientWidth));
+  }
+
+  function goTo(i) {
+    const el = scrollRef.current;
+    if (!el) return;
+    const clamped = Math.max(0, Math.min(i, last));
+    el.scrollTo({ left: clamped * el.clientWidth, behavior: "smooth" });
+  }
+
+  return (
+    <div role="group" aria-label="Project images" className="relative rounded-[8px] overflow-hidden border border-line bg-paperdim">
+      <div
+        ref={scrollRef}
+        onScroll={onScroll}
+        className="no-scrollbar flex overflow-x-auto snap-x snap-mandatory"
+      >
+        {slides.map((s, i) => (
+          <div key={s.id} className="snap-center shrink-0 w-full aspect-[4/3]">
+            <img
+              src={s.url}
+              alt={title + " image " + (i + 1)}
+              className="w-full h-full object-cover"
+              draggable={false}
+            />
+          </div>
+        ))}
+      </div>
+
+      {slides.length > 1 && (
+        <>
+          {index > 0 && (
+            <button
+              type="button"
+              onClick={() => goTo(index - 1)}
+              aria-label="Previous image"
+              className="hidden sm:flex absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 text-white text-[20px] leading-none items-center justify-center hover:bg-black/80"
+            >
+              ‹
+            </button>
+          )}
+          {index < last && (
+            <button
+              type="button"
+              onClick={() => goTo(index + 1)}
+              aria-label="Next image"
+              className="hidden sm:flex absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/60 text-white text-[20px] leading-none items-center justify-center hover:bg-black/80"
+            >
+              ›
+            </button>
+          )}
+          <div className="absolute top-3 right-3 px-2 py-0.5 rounded-full bg-black/60 text-white text-[11px] font-mono">
+            {index + 1} / {slides.length}
+          </div>
+          <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5">
+            {slides.map((s, i) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => goTo(i)}
+                aria-label={"Go to image " + (i + 1)}
+                className={`h-1.5 rounded-full transition-all ${i === index ? "w-5 bg-white" : "w-1.5 bg-white/50"}`}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function MessageButtons({ project, ownerName, router, supabase }) {
   const [user, setUser] = useState(undefined);
 
@@ -155,7 +254,7 @@ function MessageButtons({ project, ownerName, router, supabase }) {
 
   const isOwner = user.id === project.owner_id;
 
-   async function goToThread() {
+  async function goToThread() {
     if (isOwner) {
       router.push("/messages");
       return;
@@ -176,7 +275,7 @@ function MessageButtons({ project, ownerName, router, supabase }) {
     );
   }
 
-    return (
+  return (
     <div className="space-y-2.5">
       <OfferForm project={project} user={user} supabase={supabase} />
     </div>
@@ -184,6 +283,7 @@ function MessageButtons({ project, ownerName, router, supabase }) {
 }
 
 function OfferForm({ project, user, supabase }) {
+  const router = useRouter();
   const [existingOffer, setExistingOffer] = useState(undefined);
   const [showForm, setShowForm] = useState(false);
   const [amount, setAmount] = useState("");
@@ -216,9 +316,6 @@ function OfferForm({ project, user, supabase }) {
     setSubmitting(false);
   }
 
-  if (existingOffer === undefined) return null;
-  const router = useRouter();
-
   async function goToChat() {
     const threadId = await startOrOpenThread(supabase, {
       currentUserId: user.id,
@@ -227,6 +324,9 @@ function OfferForm({ project, user, supabase }) {
     });
     router.push(`/messages/${threadId}`);
   }
+
+  if (existingOffer === undefined) return null;
+
   if (existingOffer) {
     const statusLabel = {
       pending: "Offer sent — waiting for a response",
@@ -234,7 +334,7 @@ function OfferForm({ project, user, supabase }) {
       declined: "This offer wasn't selected",
       accepted: "Your offer was accepted 🎉",
     }[existingOffer.status];
-    
+
     return (
       <div className="border border-line rounded-[4px] px-4 py-3 text-[13px] text-ink bg-paperdim space-y-2">
         <div>{statusLabel} — ৳{existingOffer.amount}, {existingOffer.delivery_days} day{existingOffer.delivery_days > 1 ? "s" : ""}</div>
@@ -259,7 +359,7 @@ function OfferForm({ project, user, supabase }) {
     <form onSubmit={submitOffer} className="border border-line rounded-[6px] bg-surface p-4 space-y-3">
       <div>
         <label className="text-[12px] text-inksoft mb-1 block">Your price (৳)</label>
-                <input required type="number" name="offerAmount" value={amount} onChange={(e) => setAmount(e.target.value)}
+        <input required type="number" name="offerAmount" value={amount} onChange={(e) => setAmount(e.target.value)}
           className="w-full h-10 px-3 rounded-[4px] border border-line text-[13.5px] text-ink" />
       </div>
       <div>
@@ -283,6 +383,7 @@ function OfferForm({ project, user, supabase }) {
     </form>
   );
 }
+
 function DeleteButton({ project, router, supabase }) {
   const [user, setUser] = useState(undefined);
   const [confirming, setConfirming] = useState(false);
@@ -309,7 +410,7 @@ function DeleteButton({ project, router, supabase }) {
             className="btn-press bg-red-600 text-white text-[13px] font-medium px-4 py-2 rounded-[4px] disabled:opacity-50">
             {deleting ? "Deleting…" : "Yes, delete"}
           </button>
-                  <button onClick={() => setConfirming(false)}
+          <button onClick={() => setConfirming(false)}
             className="btn-press bg-emerald-600 text-white text-[13px] font-medium px-4 py-2 rounded-[4px] hover:bg-emerald-700">
             Cancel
           </button>
@@ -324,6 +425,7 @@ function DeleteButton({ project, router, supabase }) {
     </button>
   );
 }
+
 function OffersList({ project, router, supabase }) {
   const [user, setUser] = useState(undefined);
   const [offers, setOffers] = useState([]);
@@ -350,7 +452,7 @@ function OffersList({ project, router, supabase }) {
     setOffers((cur) => cur.map((o) => (o.id === offerId ? { ...o, status } : o)));
   }
 
-   async function startChat(agentId) {
+  async function startChat(agentId) {
     const threadId = await startOrOpenThread(supabase, {
       currentUserId: project.owner_id,
       otherUserId: agentId,
@@ -372,14 +474,14 @@ function OffersList({ project, router, supabase }) {
                 <div className="text-[13px] font-medium text-ink truncate">{o.profiles?.display_name}</div>
                 {o.profiles?.specialty && <div className="text-[11px] text-inksoft truncate">{o.profiles.specialty}</div>}
               </div>
-                            {rating && <div className="text-[12px] text-ink shrink-0"><span aria-hidden="true">⭐</span> {rating}</div>}
+              {rating && <div className="text-[12px] text-ink shrink-0"><span aria-hidden="true">⭐</span> {rating}</div>}
             </div>
             <div className="flex items-center gap-3 text-[13px] font-mono text-ink">
               <span>৳{o.amount}</span>
               <span className="text-inksoft">·</span>
               <span>{o.delivery_days}d</span>
             </div>
-                       {o.pitch && <p className="text-[12.5px] text-inksoft leading-relaxed line-clamp-3 break-words">{o.pitch}</p>}
+            {o.pitch && <p className="text-[12.5px] text-inksoft leading-relaxed line-clamp-3 break-words">{o.pitch}</p>}
 
             {o.status === "pending" && (
               <div className="flex gap-2 pt-1">
@@ -396,7 +498,7 @@ function OffersList({ project, router, supabase }) {
             {o.status === "shortlisted" && (
               <button onClick={() => startChat(o.agent_id)}
                 className="btn-press w-full bg-ink text-paper text-[12.5px] font-medium px-3 py-1.5 rounded-[4px] hover:bg-accent">
-                                <span aria-hidden="true">💬</span> Open Chat
+                <span aria-hidden="true">💬</span> Open Chat
               </button>
             )}
             {o.status === "declined" && (

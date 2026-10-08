@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { createClient } from "../../../lib/supabase/client";
 import { Avatar, money, initials, IconArrowLeft, IconStar, SecondaryButton, OnlineDot } from "../../../components/ui";
 import { useOnline, useOnlineSet } from "../../../lib/presence";
+import { budgetLabel, negotiableLabel } from "../../../lib/format";
 
 export default function ChatDetailPage() {
   const { threadId } = useParams();
@@ -26,7 +27,13 @@ export default function ChatDetailPage() {
   const [replyingTo, setReplyingTo] = useState(null);
   const bottomRef = useRef(null);
   const inputRef = useRef(null);
-  const forceScrollRef = useRef(false);
+   const forceScrollRef = useRef(false);
+  const didInitialScrollRef = useRef(false);
+
+  useEffect(() => {
+    didInitialScrollRef.current = false;
+    setMessages([]);
+  }, [threadId]);
   const channelRef = useRef(null);
   const typingTimeoutRef = useRef(null);
   const lastTypingSentRef = useRef(0);
@@ -142,7 +149,7 @@ export default function ChatDetailPage() {
 
     (async () => {
       for (const pid of missingIds) {
-        const { data: proj } = await supabase.from("projects").select("id, title, category, budget, deadline, owner_id").eq("id", pid).single();
+        const { data: proj } = await supabase.from("projects").select("id, title, category, budget, budget_min, budget_max, budget_negotiable, location, deadline, owner_id").eq("id", pid).single();
         if (!proj) continue;
         const { data: file } = await supabase.from("project_files").select("file_path").eq("project_id", pid).limit(1).maybeSingle();
         const imageUrl = file ? supabase.storage.from("project-files").getPublicUrl(file.file_path).data.publicUrl : null;
@@ -156,13 +163,26 @@ export default function ChatDetailPage() {
   const messagesContainerRef = useRef(null);
 
   useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    if (!didInitialScrollRef.current && messages.length > 0) {
+      didInitialScrollRef.current = true;
+      container.scrollTop = container.scrollHeight;
+      setTimeout(() => {
+        if (messagesContainerRef.current) {
+          messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+        }
+      }, 300);
+      return;
+    }
+
     if (forceScrollRef.current) {
       forceScrollRef.current = false;
       bottomRef.current?.scrollIntoView({ behavior: "smooth" });
       return;
     }
-    const container = messagesContainerRef.current;
-    if (!container) return;
+
     const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
     if (distanceFromBottom < 120) {
       bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -273,7 +293,7 @@ export default function ChatDetailPage() {
   const onlineIds = useOnlineSet();
 
   return (
-    <div className="h-[calc(100vh-4rem)] overflow-hidden px-5 md:px-8 py-4 flex flex-col">
+    <div className="chat-page-height overflow-hidden px-5 md:px-8 py-4 flex flex-col">
       <button onClick={() => router.push("/messages")} className="lg:hidden shrink-0 inline-flex items-center gap-2 text-[13.5px] text-inksoft hover:text-ink mb-4">
         <IconArrowLeft size={15} /> Back to messages
       </button>
@@ -301,9 +321,14 @@ export default function ChatDetailPage() {
                       <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-surface"></span>
                     )}
                   </div>
-                  <div className="min-w-0">
-                    <div className="text-[12.5px] font-medium text-ink truncate">{tName || "Agent"}</div>
-                    <div className="text-[11px] text-inksoft truncate">{t.projects?.title || "Direct message"}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="text-[12.5px] font-medium text-ink truncate">{tName || "Agent"}</span>
+                      <span className="text-[10px] text-inksoft shrink-0">{fmtListTime(t.lastMsg?.created_at)}</span>
+                    </div>
+                    <div className="text-[11px] text-inksoft truncate mt-0.5">
+                      {t.lastMsg ? (t.lastMsg.content || (t.lastMsg.project_id ? "📁 Shared a project" : t.lastMsg.file_name ? "📎 " + t.lastMsg.file_name : "")) : "No messages yet"}
+                    </div>
                   </div>
                 </button>
               );
@@ -315,14 +340,15 @@ export default function ChatDetailPage() {
           <div className="border border-line rounded-[6px] bg-surface flex flex-col overflow-hidden min-h-0">
           <div className="flex items-center gap-3 px-5 py-4 border-b border-line shrink-0">
             <Avatar tag={initials(otherName || "Agent")} size={32} src={otherAvatar} />
-            <div>
-              <div className="text-[13.5px] font-medium text-ink">{otherName || "Agent"}</div>
-              {deal ? (
-                <div className="text-[11.5px] text-accent">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-[13.5px] font-medium text-ink truncate">{otherName || "Agent"}</span>
+                <span className="shrink-0"><OnlineDot online={otherIsOnline} /></span>
+              </div>
+              {deal && (
+                <div className="text-[11.5px] text-accent truncate">
                   {deal.status === "completed" ? "Deal completed" : "Deal accepted"} · {dealProjectTitle}
                 </div>
-              ) : (
-                <OnlineDot online={otherIsOnline} />
               )}
             </div>
           </div>
@@ -401,7 +427,7 @@ export default function ChatDetailPage() {
           </div>
 
           {deal && (
-            <div className="border-t border-line px-5 py-4 bg-paperdim/60 shrink-0">
+            <div className="border-t border-line px-5 py-4 bg-paperdim/60 shrink-0 max-h-[40vh] overflow-y-auto">
               <div className="flex items-center justify-between flex-wrap gap-4">
                 <div className="flex items-center gap-6">
                   <div>
@@ -470,7 +496,7 @@ export default function ChatDetailPage() {
             </div>
           )}
 
-          <div className="flex items-center gap-2 px-5 py-4 border-t border-line shrink-0">
+          <div className="flex items-center gap-2 px-5 pt-4 border-t border-line shrink-0" style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}>
             <input
               type="file"
               id="chatFileInput"
@@ -570,10 +596,27 @@ function ProjectCardMessage({ card, currentUserId, deal, onClick, onAccept }) {
         <div className="p-3 space-y-1.5">
           <div className="flex items-center justify-between gap-2">
             <span className="text-[10.5px] text-inksoft bg-paperdim px-2 py-0.5 rounded-[3px] border border-line">{card.category}</span>
-            <span className="text-[12.5px] font-mono text-accent font-semibold">{money(card.budget)}</span>
+           <span className="text-[12.5px] font-mono text-accent font-semibold whitespace-nowrap">{budgetLabel(card)}</span>
           </div>
           <h4 className="font-display font-semibold text-[13.5px] text-ink leading-snug">{card.title}</h4>
-          <div className="text-[11px] text-inksoft">Due {card.deadline}</div>
+        <div className="flex items-center justify-between gap-2 text-[11px] text-inksoft">
+  <span>Due {card.deadline}</span>
+  {card.location && (
+    <span className="inline-flex items-center gap-1 min-w-0">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+        strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
+        <path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 1 1 16 0z" />
+        <circle cx="12" cy="10" r="3" />
+      </svg>
+      <span className="truncate">{card.location}</span>
+    </span>
+  )}
+</div>
+{negotiableLabel(card) && (
+  <span className="inline-block text-[10.5px] font-medium px-2 py-0.5 rounded-full border border-line text-inksoft">
+    {negotiableLabel(card)}
+  </span>
+)}
         </div>
       </button>
 

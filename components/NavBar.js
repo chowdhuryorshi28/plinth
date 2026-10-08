@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "../lib/supabase/client";
 import { Avatar, PrimaryButton, IconPlus, IconMenu, IconX, IconBell, IconChat, initials } from "./ui";
@@ -19,12 +19,28 @@ export default function NavBar() {
   const [notifUnread, setNotifUnread] = useState(0);
   const isOnline = useOnline(user?.id);
 
+  const [logoKey, setLogoKey] = useState(0);
+  const hadUserRef = useRef(false);
+  const mountedAtRef = useRef(Date.now());
+
   useEffect(() => {
     // Ask Supabase "who is logged in right now?" once on load...
-    supabase.auth.getUser().then(({ data }) => setUser(data.user || null));
+    supabase.auth.getUser().then(({ data }) => {
+      hadUserRef.current = !!data.user;
+      setUser(data.user || null);
+    });
     // ...and keep listening in case they log in/out in this tab.
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user || null);
+      if (event === "INITIAL_SESSION") {
+        hadUserRef.current = !!session;
+      } else if (event === "SIGNED_OUT") {
+        hadUserRef.current = false;
+      } else if (event === "SIGNED_IN" && session && !hadUserRef.current) {
+        hadUserRef.current = true;
+        // replay the logo animation on a real login (not on page load or tab refocus)
+        if (Date.now() - mountedAtRef.current > 1500) setLogoKey((k) => k + 1);
+      }
     });
     return () => sub.subscription.unsubscribe();
   }, []);
@@ -108,14 +124,16 @@ export default function NavBar() {
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-paper/90 backdrop-blur">
       <div className="max-w-7xl mx-auto px-5 md:px-8 h-16 flex items-center justify-between">
-                <Link href="/" className="flex items-center gap-2.5">
-          <span className="relative w-7 h-7 flex items-center justify-center">
-            <span className="absolute inset-0 border border-line rounded-[4px]"></span>
-            <span className="absolute top-0 left-0 w-2 h-2 border-t border-l border-accent"></span>
-            <span className="absolute bottom-0 right-0 w-2 h-2 border-b border-r border-accent"></span>
-            <span className="w-1 h-1 rounded-full bg-accent"></span>
+          <Link href="/" className="flex items-center" aria-label="Plinth home">
+          <img
+            src="/plinth-icon.png"
+            alt=""
+            draggable={false}
+            className="relative z-10 h-9 w-auto shrink-0"
+          />
+            <span className="logo-wordmark-clip" style={{ marginLeft: -6, paddingLeft: 8 }}>
+            <span key={logoKey} className="logo-wordmark text-ink">PLINTH</span>
           </span>
-          <span className="font-display font-extrabold text-[19px] tracking-tight text-ink">Plinth</span>
         </Link>
 
         <nav className="hidden md:flex items-center gap-4">
