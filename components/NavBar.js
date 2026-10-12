@@ -12,7 +12,8 @@ export default function NavBar() {
  
   const [user, setUser] = useState(null);   // the Supabase auth user (or null)
   const [profile, setProfile] = useState(null); // our own "profiles" row for that user
-  const [mobileOpen, setMobileOpen] = useState(false);
+const [mobileOpen, setMobileOpen] = useState(false);
+const [isAdmin, setIsAdmin] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState([]);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -46,9 +47,10 @@ export default function NavBar() {
   }, []);
 
   useEffect(() => {
-    if (!user) { setProfile(null); return; }
+  if (!user) { setProfile(null); setIsAdmin(false); return; }
     supabase.from("profiles").select("*").eq("id", user.id).single()
-      .then(({ data }) => setProfile(data || null));
+   .then(({ data }) => setProfile(data || null));
+    supabase.rpc("is_admin").then(({ data }) => setIsAdmin(data === true));
   }, [user]);
 
   useEffect(() => {
@@ -152,7 +154,8 @@ export default function NavBar() {
                 <PrimaryButton onClick={() => router.push("/")}>Browse Open Projects</PrimaryButton>
               )}
                             <Link href="/agents" className="text-[14px] text-inksoft hover:text-ink">Find Agents</Link>
-              <Link href="/dashboard" className="text-[14px] text-inksoft hover:text-ink">Dashboard</Link>
+            <Link href="/dashboard" className="text-[14px] text-inksoft hover:text-ink">Dashboard</Link>
+              {isAdmin && <Link href="/admin/disputes" className="text-[14px] text-accent hover:underline">Admin</Link>}
               <Link href="/messages" className="relative text-inksoft hover:text-ink p-1" title="Messages" aria-label="Messages">
                 <IconChat size={19} />
                 {unreadCount > 0 && (
@@ -253,7 +256,8 @@ export default function NavBar() {
                 <Link href="/post" onClick={() => setMobileOpen(false)}>Post a Project</Link>
               )}
               <Link href="/agents" onClick={() => setMobileOpen(false)}>Find Agents</Link>
-              <Link href="/dashboard" onClick={() => setMobileOpen(false)}>Dashboard</Link>
+             <Link href="/dashboard" onClick={() => setMobileOpen(false)}>Dashboard</Link>
+              {isAdmin && <Link href="/admin/disputes" onClick={() => setMobileOpen(false)}>Admin</Link>}
 
               <Link href="/profile" onClick={() => setMobileOpen(false)}>Profile</Link>
               <button onClick={logout} className="text-left text-inksoft">Log out</button>

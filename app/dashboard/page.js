@@ -106,7 +106,13 @@ export default function DashboardPage() {
               {myDeals.map((d) => (
                 <a key={d.id} href={`/projects/${d.projects?.id}`} className="border border-line rounded-[6px] bg-surface p-5 block hover:border-accent transition-colors">
                   <div className="flex items-center gap-2 mb-3">
-                    <StatusBadge status={d.status === "completed" ? "completed" : "in_progress"} />
+ {d.status === "cancelled" ? (
+  <span className="text-[11px] font-medium px-2 py-0.5 rounded-full border border-red-500 text-red-500">Cancelled</span>
+) : d.status === "disputed" ? (
+  <span className="text-[11px] font-medium px-2 py-0.5 rounded-full border border-[var(--amber)] text-[var(--amber)]">Under review</span>
+) : (
+  <StatusBadge status={d.status === "completed" ? "completed" : "in_progress"} />
+)}
                   </div>
                   <h3 className="font-display font-bold text-[15px] text-ink mb-2">{d.projects?.title}</h3>
                   <div className="text-[13px] font-mono text-accent">{money(d.payout)} <span className="text-inksoft">payout</span></div>

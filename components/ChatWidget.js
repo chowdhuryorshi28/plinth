@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { createClient } from "../lib/supabase/client";
 import { Avatar, initials, money } from "./ui";
+import { budgetLabel } from "../lib/format";
 
 export default function ChatWidget() {
   const supabase = createClient();
@@ -79,7 +80,7 @@ export default function ChatWidget() {
         .then(({ data }) => setMessages(data || []));
     };
     const loadDeal = () => {
-      supabase.from("deals").select("*").eq("thread_id", activeThread.id).maybeSingle()
+      supabase.from("deals").select("*").eq("thread_id", activeThread.id).order("created_at", { ascending: false }).limit(1).maybeSingle()
         .then(({ data }) => {
           setDeal(data || null);
           if (data) {
@@ -131,7 +132,7 @@ export default function ChatWidget() {
 
     (async () => {
       for (const pid of missingIds) {
-        const { data: proj } = await supabase.from("projects").select("id, title, category, budget, deadline, owner_id").eq("id", pid).single();
+        const { data: proj } = await supabase.from("projects").select("id, title, category, budget, budget_min, budget_max, budget_negotiable, location, deadline, owner_id").eq("id", pid).single();
         if (!proj) continue;
         const { data: file } = await supabase.from("project_files").select("file_path").eq("project_id", pid).limit(1).maybeSingle();
         const imageUrl = file ? supabase.storage.from("project-files").getPublicUrl(file.file_path).data.publicUrl : null;
@@ -166,7 +167,7 @@ export default function ChatWidget() {
   }
 
   async function acceptOfferForCard(card) {
-    if (!card.offer || deal) return;
+    if (!card.offer || (deal && !["completed", "cancelled"].includes(deal.status))) return;
     const agentId = card.owner_id === activeThread.owner_id ? activeThread.helper_id : activeThread.owner_id;
     const { data, error } = await supabase.from("deals").insert({
       thread_id: activeThread.id, project_id: card.id,
@@ -307,9 +308,9 @@ export default function ChatWidget() {
               {deal && (
                 <div className="flex items-center justify-between gap-2 px-3.5 py-2 border-t border-line shrink-0 bg-paperdim/60 text-[11.5px]">
                   <span className="text-ink truncate">
-                    ✓ {money(deal.amount)} · {dealProjectTitle}
+                    ✓ {money(deal.amount)}{deal.status === "cancelled" ? " (cancelled)" : deal.status === "disputed" ? " (under review)" : ""} · {dealProjectTitle}
                   </span>
-                  {dealIsOwner && deal.status !== "completed" && (
+                 {dealIsOwner && deal.status === "accepted" && (
                     <button onClick={markComplete} className="shrink-0 text-accent font-medium hover:underline">
                       Mark Complete
                     </button>
@@ -368,8 +369,8 @@ function ProjectCardMini({ card, currentUserId, deal, onClick, onAccept }) {
     return <div className="w-56 h-20 rounded-[7px] border border-line bg-paperdim animate-pulse"></div>;
   }
   const isOwnerHere = currentUserId === card.owner_id;
-  const dealIsForThisCard = deal && deal.project_id === card.id;
-  const canAccept = isOwnerHere && card.offer && ["pending", "shortlisted"].includes(card.offer.status) && !deal;
+  const dealIsForThisCard = deal && deal.project_id === card.id && ["accepted", "completed"].includes(deal.status);
+  const canAccept = isOwnerHere && card.offer && ["pending", "shortlisted"].includes(card.offer.status) && (!deal || ["completed", "cancelled"].includes(deal.status));
 
   return (
     <div className="w-56 rounded-[7px] border border-line bg-surface overflow-hidden">
@@ -378,14 +379,14 @@ function ProjectCardMini({ card, currentUserId, deal, onClick, onAccept }) {
         <div className="p-2 space-y-1">
           <div className="flex items-center justify-between gap-2">
             <span className="text-[9.5px] text-inksoft bg-paperdim px-1.5 py-0.5 rounded-[3px] border border-line">{card.category}</span>
-            <span className="text-[11px] font-mono text-accent font-semibold">{money(card.budget)}</span>
+            <span className="text-[11px] font-mono text-accent font-semibold">{budgetLabel(card)}</span>
           </div>
           <h4 className="font-display font-semibold text-[12px] text-ink leading-snug">{card.title}</h4>
         </div>
       </button>
       {dealIsForThisCard && (
         <div className="px-2 py-1.5 border-t border-line text-[10.5px] text-accent font-medium">
-          {deal.status === "completed" ? "✓ Deal completed" : "✓ Deal accepted"}
+          {deal.status === "completed" ? "✓ Deal completed" : deal.status === "cancelled" ? "✓ Deal cancelled" : "✓ Deal accepted"}
         </div>
       )}
       {canAccept && (

@@ -5,6 +5,7 @@ import { createClient } from "../../../lib/supabase/client";
 import { Avatar, money, initials, IconArrowLeft, IconStar, SecondaryButton, OnlineDot } from "../../../components/ui";
 import { useOnline, useOnlineSet } from "../../../lib/presence";
 import { budgetLabel, negotiableLabel } from "../../../lib/format";
+import DealPanel from "../../../components/DealPanel";
 
 export default function ChatDetailPage() {
   const { threadId } = useParams();
@@ -94,7 +95,7 @@ export default function ChatDetailPage() {
         .then(({ data }) => setMessages(data || []));
     };
     const loadDeal = () => {
-      supabase.from("deals").select("*").eq("thread_id", thread.id).maybeSingle()
+supabase.from("deals").select("*").eq("thread_id", thread.id).order("created_at", { ascending: false }).limit(1).maybeSingle()
         .then(({ data }) => {
           setDeal(data || null);
           if (data) {
@@ -211,7 +212,7 @@ export default function ChatDetailPage() {
   }
 
   async function acceptOfferForCard(card) {
-    if (!card.offer || deal) return;
+   if (!card.offer || (deal && !["completed", "cancelled"].includes(deal.status))) return;
     const agentId = card.owner_id === thread.owner_id ? thread.helper_id : thread.owner_id;
     const { data, error } = await supabase.from("deals").insert({
       thread_id: thread.id, project_id: card.id,
@@ -347,13 +348,13 @@ export default function ChatDetailPage() {
               </div>
               {deal && (
                 <div className="text-[11.5px] text-accent truncate">
-                  {deal.status === "completed" ? "Deal completed" : "Deal accepted"} · {dealProjectTitle}
+{{ completed: "Deal completed", cancelled: "Deal cancelled", disputed: "Under review" }[deal.status] || "Deal accepted"}
                 </div>
               )}
             </div>
           </div>
 
-          <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-5 py-5 space-y-3 min-h-[320px]">
+          <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-5 py-5 space-y-3 min-h-[140px]">
             {messages.length === 0 && (
               <p className="text-[13px] text-inksoft text-center mt-10">No messages yet — say hello.</p>
             )}
@@ -427,59 +428,15 @@ export default function ChatDetailPage() {
           </div>
 
           {deal && (
-            <div className="border-t border-line px-5 py-4 bg-paperdim/60 shrink-0 max-h-[40vh] overflow-y-auto">
-              <div className="flex items-center justify-between flex-wrap gap-4">
-                <div className="flex items-center gap-6">
-                  <div>
-                    <div className="text-[10.5px] uppercase tracking-wide text-inksoft">Agreed</div>
-                    <div className="text-[18px] font-mono font-bold text-ink">{money(deal.amount)}</div>
-                  </div>
-                  <div>
-                    <div className="text-[10.5px] uppercase tracking-wide text-inksoft">Platform fee</div>
-                    <div className="text-[14px] font-mono text-ink">{money(deal.fee)}</div>
-                  </div>
-                  <div>
-                    <div className="text-[10.5px] uppercase tracking-wide text-inksoft">Helper receives</div>
-                    <div className="text-[14px] font-mono text-accent font-semibold">{money(deal.payout)}</div>
-                  </div>
-                </div>
-                {dealIsOwner && deal.status !== "completed" && (
-                  <button onClick={markComplete} className="btn-press bg-ink text-paper hover:bg-accent font-medium text-[13.5px] px-4 py-2.5 rounded-[4px]">
-                    Mark Complete
-                  </button>
-                )}
-              </div>
-
-              {dealIsOwner && deal.status === "completed" && !ratingSubmitted && (
-                <div className="mt-4 pt-4 border-t border-line">
-                  <p className="text-[13px] text-ink font-medium mb-2">Rate this agent</p>
-                  <div className="flex items-center gap-1 mb-3">
-                    {[1, 2, 3, 4, 5].map((n) => (
-                      <button key={n} onClick={() => setRatingStars(n)} className="text-[22px] leading-none">
-                        {n <= ratingStars ? "★" : "☆"}
-                      </button>
-                    ))}
-                  </div>
-                  <input
-                    value={ratingComment}
-                    onChange={(e) => setRatingComment(e.target.value)}
-                    placeholder="Optional comment…"
-                    className="w-full h-10 px-3 rounded-[4px] border border-line text-[13px] text-ink mb-2 bg-paper"
-                  />
-                  <button
-                    onClick={submitRating}
-                    disabled={!ratingStars || submittingRating}
-                    className="btn-press bg-ink text-paper hover:bg-accent font-medium text-[13px] px-4 py-2 rounded-[4px] disabled:opacity-40"
-                  >
-                    {submittingRating ? "Submitting…" : "Submit rating"}
-                  </button>
-                </div>
-              )}
-
-              {dealIsOwner && deal.status === "completed" && ratingSubmitted && (
-                <p className="text-[12.5px] text-accent mt-4 pt-4 border-t border-line">✓ You rated this agent</p>
-              )}
-            </div>
+            <DealPanel
+              key={deal.id}
+              deal={deal}
+              user={user}
+              supabase={supabase}
+              otherName={otherName}
+              onMarkComplete={markComplete}
+              onDealChange={setDeal}
+            />
           )}
 
           {replyingTo && (
@@ -581,9 +538,8 @@ function ProjectCardMessage({ card, currentUserId, deal, onClick, onAccept }) {
     return <div className="w-72 h-24 rounded-[8px] border border-line bg-paperdim animate-pulse"></div>;
   }
   const isOwnerHere = currentUserId === card.owner_id;
-  const dealIsForThisCard = deal && deal.project_id === card.id;
-  const canAccept = isOwnerHere && card.offer && ["pending", "shortlisted"].includes(card.offer.status) && !deal;
-
+  const dealIsForThisCard = deal && deal.project_id === card.id && ["accepted", "completed"].includes(deal.status);
+  const canAccept = isOwnerHere && card.offer && ["pending", "shortlisted"].includes(card.offer.status) && (!deal || ["completed", "cancelled"].includes(deal.status));
   return (
     <div className="w-72 rounded-[8px] border border-line bg-surface overflow-hidden">
       <button onClick={onClick} className="tick card-lift text-left w-full block">
