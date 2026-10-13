@@ -212,22 +212,20 @@ supabase.from("deals").select("*").eq("thread_id", thread.id).order("created_at"
   }
 
   async function acceptOfferForCard(card) {
-   if (!card.offer || (deal && !["completed", "cancelled"].includes(deal.status))) return;
+    if (!card.offer || (deal && !["completed", "cancelled"].includes(deal.status))) return;
     const agentId = card.owner_id === thread.owner_id ? thread.helper_id : thread.owner_id;
     const { data, error } = await supabase.from("deals").insert({
       thread_id: thread.id, project_id: card.id,
       owner_id: card.owner_id, helper_id: agentId, amount: card.offer.amount,
     }).select().single();
-    if (!error) {
-      await supabase.from("threads").update({ status: "deal_accepted" }).eq("id", thread.id);
-      await supabase.from("projects").update({ status: "in_progress" }).eq("id", card.id);
-      setDeal(data);
-      setDealProjectTitle(card.title);
-      await supabase.from("offers").update({ status: "accepted" }).eq("id", card.offer.id);
-      await supabase.from("offers").update({ status: "declined" })
-        .eq("project_id", card.id).neq("id", card.offer.id).in("status", ["pending", "shortlisted"]);
+    if (error) {
+      window.alert(error.message);
+      return;
     }
+    setDeal(data);
+    setDealProjectTitle(card.title);
   }
+  
 
   async function markComplete() {
     if (!deal) return;
@@ -348,7 +346,7 @@ supabase.from("deals").select("*").eq("thread_id", thread.id).order("created_at"
               </div>
               {deal && (
                 <div className="text-[11.5px] text-accent truncate">
-{{ completed: "Deal completed", cancelled: "Deal cancelled", disputed: "Under review" }[deal.status] || "Deal accepted"}
+{{ completed: "Deal completed", cancelled: "Deal cancelled", disputed: "Under review", awaiting_payment: "Awaiting payment" }[deal.status] || "Deal accepted"}
                 </div>
               )}
             </div>

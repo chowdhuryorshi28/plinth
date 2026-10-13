@@ -111,7 +111,11 @@ export default function DashboardPage() {
 ) : d.status === "disputed" ? (
   <span className="text-[11px] font-medium px-2 py-0.5 rounded-full border border-[var(--amber)] text-[var(--amber)]">Under review</span>
 ) : (
+  d.status === "awaiting_payment" ? (
+  <span className="text-[11px] font-medium px-2 py-0.5 rounded-full border border-[var(--amber)] text-[var(--amber)]">Awaiting payment</span>
+) : (
   <StatusBadge status={d.status === "completed" ? "completed" : "in_progress"} />
+)
 )}
                   </div>
                   <h3 className="font-display font-bold text-[15px] text-ink mb-2">{d.projects?.title}</h3>

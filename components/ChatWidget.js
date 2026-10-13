@@ -173,15 +173,13 @@ export default function ChatWidget() {
       thread_id: activeThread.id, project_id: card.id,
       owner_id: card.owner_id, helper_id: agentId, amount: card.offer.amount,
     }).select().single();
-    if (!error) {
-      await supabase.from("threads").update({ status: "deal_accepted" }).eq("id", activeThread.id);
-      await supabase.from("projects").update({ status: "in_progress" }).eq("id", card.id);
-      setDeal(data);
-      setDealProjectTitle(card.title);
-      await supabase.from("offers").update({ status: "accepted" }).eq("id", card.offer.id);
-      await supabase.from("offers").update({ status: "declined" })
-        .eq("project_id", card.id).neq("id", card.offer.id).in("status", ["pending", "shortlisted"]);
+    if (error) {
+      window.alert(error.message);
+      return;
     }
+    setDeal(data);
+    setDealProjectTitle(card.title);
+    router.push(`/messages/${activeThread.id}`);
   }
 
   async function markComplete() {
@@ -308,7 +306,7 @@ export default function ChatWidget() {
               {deal && (
                 <div className="flex items-center justify-between gap-2 px-3.5 py-2 border-t border-line shrink-0 bg-paperdim/60 text-[11.5px]">
                   <span className="text-ink truncate">
-                    ✓ {money(deal.amount)}{deal.status === "cancelled" ? " (cancelled)" : deal.status === "disputed" ? " (under review)" : ""} · {dealProjectTitle}
+                    ✓ {money(deal.amount)}{deal.status === "cancelled" ? " (cancelled)" : deal.status === "disputed" ? " (under review)" : deal.status === "awaiting_payment" ? " (awaiting payment)" : ""}· {dealProjectTitle}
                   </span>
                  {dealIsOwner && deal.status === "accepted" && (
                     <button onClick={markComplete} className="shrink-0 text-accent font-medium hover:underline">

@@ -154,8 +154,9 @@ const [isAdmin, setIsAdmin] = useState(false);
                 <PrimaryButton onClick={() => router.push("/")}>Browse Open Projects</PrimaryButton>
               )}
                             <Link href="/agents" className="text-[14px] text-inksoft hover:text-ink">Find Agents</Link>
-            <Link href="/dashboard" className="text-[14px] text-inksoft hover:text-ink">Dashboard</Link>
-              {isAdmin && <Link href="/admin/disputes" className="text-[14px] text-accent hover:underline">Admin</Link>}
+          <Link href="/dashboard" className="text-[14px] text-inksoft hover:text-ink">Dashboard</Link>
+              <Link href="/wallet" className="text-[14px] text-inksoft hover:text-ink">Wallet</Link>
+            {isAdmin && <Link href="/admin/payments" className="text-[14px] text-accent hover:underline">Admin</Link>}
               <Link href="/messages" className="relative text-inksoft hover:text-ink p-1" title="Messages" aria-label="Messages">
                 <IconChat size={19} />
                 {unreadCount > 0 && (
@@ -257,7 +258,8 @@ const [isAdmin, setIsAdmin] = useState(false);
               )}
               <Link href="/agents" onClick={() => setMobileOpen(false)}>Find Agents</Link>
              <Link href="/dashboard" onClick={() => setMobileOpen(false)}>Dashboard</Link>
-              {isAdmin && <Link href="/admin/disputes" onClick={() => setMobileOpen(false)}>Admin</Link>}
+              <Link href="/wallet" onClick={() => setMobileOpen(false)}>Wallet</Link>
+           {isAdmin && <Link href="/admin/payments" onClick={() => setMobileOpen(false)}>Admin</Link>}
 
               <Link href="/profile" onClick={() => setMobileOpen(false)}>Profile</Link>
               <button onClick={logout} className="text-left text-inksoft">Log out</button>

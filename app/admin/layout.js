@@ -1,8 +1,15 @@
+import AdminTabs from "../../components/AdminTabs";
+
 export const metadata = {
-title: "Plinth",
+  title: "Plinth",
   robots: { index: false, follow: false },
 };
 
 export default function AdminLayout({ children }) {
-  return children;
+  return (
+    <>
+      <AdminTabs />
+      {children}
+    </>
+  );
 }

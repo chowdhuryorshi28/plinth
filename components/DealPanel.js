@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { money } from "./ui";
+import DealPayment from "./DealPayment";
 
 const TICK = "\u2713";
 const STAR_ON = "\u2605";
@@ -11,6 +12,8 @@ const STATUS_CHIP = {
   completed: { label: "Completed", cls: "border-accent text-accent" },
   cancelled: { label: "Cancelled", cls: "border-red-500 text-red-500" },
   disputed: { label: "Under review", cls: "border-[var(--amber)] text-[var(--amber)]" },
+  awaiting_payment: { label: "Awaiting payment", cls: "border-[var(--amber)] text-[var(--amber)]" },
+
 };
 
 function fmtDate(ts) {
@@ -99,11 +102,17 @@ export default function DealPanel({ deal, user, supabase, otherName, onMarkCompl
   const finished = status === "completed";
   const cancelled = status === "cancelled";
 
+  const paidFlow = deal.payment_status !== "legacy";
+  const waitingPay = status === "awaiting_payment";
+  const paymentDone = !paidFlow || ["paid", "refunded"].includes(deal.payment_status);
   const steps = [
     { key: "offer", label: "Offer sent", date: offer?.created_at, state: "done" },
     { key: "shortlisted", label: "Shortlisted", date: offer?.shortlisted_at, state: "done" },
     { key: "accepted", label: "Accepted", date: deal.created_at, state: "done" },
-    { key: "progress", label: "In progress", date: null, state: finished || cancelled ? "done" : "current" },
+    ...(paidFlow
+      ? [{ key: "payment", label: "Payment confirmed", date: deal.paid_at, state: paymentDone ? "done" : waitingPay ? "current" : "todo" }]
+      : []),
+    { key: "progress", label: "In progress", date: null, state: waitingPay ? "todo" : finished || cancelled ? (paymentDone ? "done" : "todo") : "current" },
     finished
       ? { key: "completed", label: "Completed", date: deal.completed_at, state: "done" }
       : cancelled
@@ -212,6 +221,10 @@ export default function DealPanel({ deal, user, supabase, otherName, onMarkCompl
             </li>
           ))}
         </ol>
+      )}
+
+    {status === "awaiting_payment" && (
+        <DealPayment deal={deal} user={user} supabase={supabase} otherName={otherName} onDealChange={onDealChange} />
       )}
 
       {status === "disputed" && (
