@@ -2,6 +2,7 @@ import "./globals.css";
 import NavBar from "../components/NavBar";
 import Footer from "../components/Footer";
 import ChatWidget from "../components/ChatWidget";
+import RegisterSW from "../components/RegisterSW";
 import { PresenceProvider } from "../lib/presence";
 
 export const metadata = {
@@ -13,6 +14,14 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <head>
+    <link rel="manifest" href="/manifest.webmanifest" />
+        <link rel="icon" href="/icons/icon-192.png" type="image/png" sizes="192x192" />
+        <meta name="theme-color" content="#16150f" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-title" content="Plinth" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
@@ -25,7 +34,8 @@ export default function RootLayout({ children }) {
           <NavBar />
           <main className="flex-1">{children}</main>
           <Footer />
-          <ChatWidget />
+        <ChatWidget />
+          <RegisterSW />
         </PresenceProvider>
       </body>
     </html>
