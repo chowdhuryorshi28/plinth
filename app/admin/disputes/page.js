@@ -54,7 +54,7 @@ export default function AdminDisputesPage() {
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
       if (!data?.user) {
-      router.push("/admin/login");
+     router.push("/login");
         return;
       }
       const { data: ok } = await supabase.rpc("is_admin");
@@ -178,7 +178,17 @@ export default function AdminDisputesPage() {
 
                 <div className="mt-4 border-l-2 border-accent pl-3">
                   <div className="text-[10.5px] uppercase tracking-wide text-inksoft mb-1">Reason</div>
-                  <p className="text-[13.5px] text-ink break-words">{r.reason}</p>
+                 <p className="text-[13.5px] text-ink break-words">{r.reason}</p>
+                                   {r.cancel_reason && (
+                    <p className="text-[12.5px] text-inksoft break-words mt-2">
+                      Earlier, {r.cancel_by_name || "someone"} asked to cancel this deal: &ldquo;{r.cancel_reason}&rdquo;
+                    </p>
+                  )}
+                  {r.cancel_reason && (
+                    <p className="text-[12.5px] text-inksoft break-words mt-2">
+                      Earlier, {r.cancel_by_name || "someone"} asked to cancel this deal: &ldquo;{r.cancel_reason}&rdquo;
+                    </p>
+                  )}
                 </div>
 
                 {r.request_status !== "pending" && (

@@ -155,7 +155,7 @@ const [isAdmin, setIsAdmin] = useState(false);
               )}
                             <Link href="/agents" className="text-[14px] text-inksoft hover:text-ink">Find Agents</Link>
           <Link href="/dashboard" className="text-[14px] text-inksoft hover:text-ink">Dashboard</Link>
-              <Link href="/wallet" className="text-[14px] text-inksoft hover:text-ink">Wallet</Link>
+          <Link href="/earnings" className="text-[14px] text-inksoft hover:text-ink">Earnings</Link>
             {isAdmin && <Link href="/admin/payments" className="text-[14px] text-accent hover:underline">Admin</Link>}
               <Link href="/messages" className="relative text-inksoft hover:text-ink p-1" title="Messages" aria-label="Messages">
                 <IconChat size={19} />
@@ -258,7 +258,7 @@ const [isAdmin, setIsAdmin] = useState(false);
               )}
               <Link href="/agents" onClick={() => setMobileOpen(false)}>Find Agents</Link>
              <Link href="/dashboard" onClick={() => setMobileOpen(false)}>Dashboard</Link>
-              <Link href="/wallet" onClick={() => setMobileOpen(false)}>Wallet</Link>
+         <Link href="/earnings" onClick={() => setMobileOpen(false)}>Earnings</Link>
            {isAdmin && <Link href="/admin/payments" onClick={() => setMobileOpen(false)}>Admin</Link>}
 
               <Link href="/profile" onClick={() => setMobileOpen(false)}>Profile</Link>

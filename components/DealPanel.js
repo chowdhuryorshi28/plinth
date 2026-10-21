@@ -33,6 +33,11 @@ function deadlineEnd(text) {
   return Date.UTC(year, month - 1, day + 1) - 6 * 60 * 60 * 1000;
 }
 
+function fmtDateTime(ts) {
+  if (!ts) return "";
+  return new Date(ts).toLocaleString([], { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
 function StepDot({ state }) {
   if (state === "done") return <span className="w-2.5 h-2.5 rounded-full bg-accent shrink-0"></span>;
   if (state === "current") return <span className="w-2.5 h-2.5 rounded-full bg-accent ring-2 ring-accent/40 shrink-0"></span>;
@@ -53,7 +58,9 @@ export default function DealPanel({ deal, user, supabase, otherName, onMarkCompl
   const [ratingStars, setRatingStars] = useState(0);
   const [ratingComment, setRatingComment] = useState("");
   const [ratingSubmitted, setRatingSubmitted] = useState(false);
-  const [submittingRating, setSubmittingRating] = useState(false);
+   const [submittingRating, setSubmittingRating] = useState(false);
+  const [ratingChecked, setRatingChecked] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   async function loadRequests() {
     const { data } = await supabase
@@ -77,7 +84,7 @@ export default function DealPanel({ deal, user, supabase, otherName, onMarkCompl
       .eq("project_id", deal.project_id).eq("agent_id", deal.helper_id).maybeSingle()
       .then(({ data }) => { if (!stale) setOffer(data || null); });
     supabase.from("ratings").select("id").eq("deal_id", deal.id).maybeSingle()
-      .then(({ data }) => { if (!stale) setRatingSubmitted(!!data); });
+        .then(({ data }) => { if (!stale) { setRatingSubmitted(!!data); setRatingChecked(true); } });
     return () => { stale = true; };
   }, [deal.id]);
 
@@ -98,7 +105,9 @@ export default function DealPanel({ deal, user, supabase, otherName, onMarkCompl
   const end = deadlineEnd(project?.deadline);
   const overdue = status === "accepted" && end !== null && now >= end;
   const pendingCancel = requests.find((r) => r.kind === "cancel" && r.status === "pending");
-  const dispute = requests.find((r) => r.kind === "dispute");
+ const dispute = requests.find((r) => r.kind === "dispute");
+    const myDispute = requests.find((r) => r.kind === "dispute" && r.requested_by === user.id);
+  const canDispute = isOwner || !!deal.delivered_at || (end !== null && now >= end);
   const finished = status === "completed";
   const cancelled = status === "cancelled";
 
@@ -112,7 +121,10 @@ export default function DealPanel({ deal, user, supabase, otherName, onMarkCompl
     ...(paidFlow
       ? [{ key: "payment", label: "Payment confirmed", date: deal.paid_at, state: paymentDone ? "done" : waitingPay ? "current" : "todo" }]
       : []),
-    { key: "progress", label: "In progress", date: null, state: waitingPay ? "todo" : finished || cancelled ? (paymentDone ? "done" : "todo") : "current" },
+    { key: "progress", label: "In progress", date: null, state: waitingPay ? "todo" : finished || cancelled ? (paymentDone ? "done" : "todo") : deal.delivered_at ? "done" : "current" },
+    ...(deal.delivered_at || status === "accepted" || status === "disputed"
+      ? [{ key: "delivered", label: "Delivered", date: deal.delivered_at, state: deal.delivered_at ? (finished || cancelled ? "done" : "current") : "todo" }]
+      : []),
     finished
       ? { key: "completed", label: "Completed", date: deal.completed_at, state: "done" }
       : cancelled
@@ -120,8 +132,20 @@ export default function DealPanel({ deal, user, supabase, otherName, onMarkCompl
         : { key: "completed", label: "Completed", date: null, state: "todo" },
   ];
 
+  async function markDelivered() {
+    if (busy) return;
+    if (!window.confirm("Mark this work as delivered? The client will be asked to review it.")) return;
+    setBusy(true);
+    setError("");
+    const { error: rpcError } = await supabase.rpc("mark_deal_delivered", { p_deal_id: deal.id });
+    setBusy(false);
+    if (rpcError) { setError(rpcError.message); return; }
+    await refreshDeal();
+  }
+
   async function submitRequest() {
-    if (!reason.trim() || busy) return;
+    if (busy) return;
+    if (mode === "dispute" ? reason.trim().length < 20 : !reason.trim()) return;
     setBusy(true);
     setError("");
     const fn = mode === "dispute" ? "raise_deal_dispute" : "request_deal_cancel";
@@ -163,10 +187,35 @@ export default function DealPanel({ deal, user, supabase, otherName, onMarkCompl
     setSubmittingRating(false);
   }
 
+    const compact = cancelled || (finished && (!isOwner || ratingSubmitted));
+
+  if (finished && isOwner && !ratingChecked) return null;
+
+  if (compact && !expanded) {
+    return (
+      <div className="border-t border-line px-5 py-2.5 bg-paperdim/60 shrink-0 flex items-center justify-between gap-3 text-[12.5px]">
+        <span className="text-ink truncate">
+          {cancelled ? "Deal cancelled" : "Deal completed"} &middot; {money(deal.amount)}
+          {finished && isOwner && ratingSubmitted ? " \u00B7 " + TICK + " Rated" : ""}
+        </span>
+        <button type="button" onClick={() => setExpanded(true)} className="shrink-0 text-accent hover:underline">
+          Show details
+        </button>
+      </div>
+    );
+  }
+
   const whoAsked = (r) => (r.requested_by === user.id ? "You" : otherName || "The other person");
 
   return (
-    <div className="border-t border-line px-5 py-4 bg-paperdim/60 shrink-0 max-h-[40vh] overflow-y-auto">
+   <div className="border-t border-line px-5 py-4 bg-paperdim/60 shrink-0 max-h-[40vh] overflow-y-auto">
+      {compact && (
+        <div className="flex justify-end -mt-1 mb-2">
+          <button type="button" onClick={() => setExpanded(false)} className="text-[12px] text-inksoft hover:text-ink underline">
+            Hide details
+          </button>
+        </div>
+      )}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center gap-6 flex-wrap">
           <div>
@@ -223,7 +272,43 @@ export default function DealPanel({ deal, user, supabase, otherName, onMarkCompl
         </ol>
       )}
 
-    {status === "awaiting_payment" && (
+   {status === "accepted" && deal.delivered_at && (
+        <div className="mt-4 border border-accent rounded-[4px] px-3 py-2.5 text-[12.5px] text-ink">
+          {isOwner ? (
+            <>
+              <div className="font-medium">{otherName || "The agent"} marked the work as delivered.</div>
+              <div className="text-inksoft mt-0.5">
+                Check it, then press Mark Complete or raise a dispute. If you do nothing, the deal completes automatically on {fmtDateTime(deal.review_ends_at)}.
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="font-medium">You marked the work as delivered.</div>
+              <div className="text-inksoft mt-0.5">
+                The client can accept it or raise a dispute. If they do nothing, the deal completes automatically on {fmtDateTime(deal.review_ends_at)}.
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {!isOwner && status === "accepted" && !deal.delivered_at && (
+        <div className="mt-4">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={markDelivered}
+            className="btn-press bg-ink text-paper hover:bg-accent text-[12.5px] font-medium px-3 py-2 rounded-[4px] disabled:opacity-50"
+          >
+            Mark as delivered
+          </button>
+          <p className="text-[11.5px] text-inksoft mt-1.5">
+            Press this when the finished work has been sent. The client then has a few days to accept it or raise a dispute. If they don&apos;t respond, the deal completes automatically.
+          </p>
+        </div>
+      )}
+
+      {status === "awaiting_payment" && (
         <DealPayment deal={deal} user={user} supabase={supabase} otherName={otherName} onDealChange={onDealChange} />
       )}
 
@@ -274,13 +359,19 @@ export default function DealPanel({ deal, user, supabase, otherName, onMarkCompl
       )}
 
       {status === "accepted" && !pendingCancel && !mode && (
-        <div className="flex items-center gap-4 mt-4">
+        <div className="flex items-center gap-4 mt-4 flex-wrap">
           <button type="button" onClick={() => { setMode("cancel"); setError(""); }} className="text-[12.5px] text-inksoft hover:text-ink underline">
             Request cancellation
           </button>
-          <button type="button" onClick={() => { setMode("dispute"); setError(""); }} className="text-[12.5px] text-inksoft hover:text-red-500 underline">
-            Raise a dispute
-          </button>
+          {myDispute ? (
+<span className="text-[12px] text-inksoft">You have already raised a dispute on this deal.</span>
+          ) : !canDispute ? (
+            <span className="text-[12px] text-inksoft">You can raise a dispute once you mark the work as delivered, or once the deadline has passed.</span>
+          ) : (
+            <button type="button" onClick={() => { setMode("dispute"); setError(""); }} className="text-[12.5px] text-inksoft hover:text-red-500 underline">
+              Raise a dispute
+            </button>
+          )}
         </div>
       )}
 
@@ -299,13 +390,13 @@ export default function DealPanel({ deal, user, supabase, otherName, onMarkCompl
           />
           <p className="text-[11.5px] text-inksoft">
             {mode === "dispute"
-              ? "Raising a dispute freezes the deal until it has been reviewed."
+           ? `Raising a dispute freezes the deal until it has been reviewed. Write at least 20 characters (${reason.trim().length}/20).`
               : `${otherName || "The other person"} must accept before the deal is cancelled.`}
           </p>
           <div className="flex gap-2">
             <button
               type="button"
-              disabled={busy || !reason.trim()}
+       disabled={busy || (mode === "dispute" ? reason.trim().length < 20 : !reason.trim())}
               onClick={submitRequest}
               className="btn-press bg-ink text-paper hover:bg-accent text-[12.5px] font-medium px-3 py-1.5 rounded-[4px] disabled:opacity-40"
             >

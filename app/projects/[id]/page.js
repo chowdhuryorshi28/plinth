@@ -347,6 +347,14 @@ function OfferForm({ project, user, supabase }) {
     );
   }
 
+  if (project.status && project.status !== "open") {
+    return (
+      <div className="border border-line rounded-[4px] px-4 py-3 text-[13px] text-inksoft bg-paperdim">
+        This project is no longer taking offers.
+      </div>
+    );
+  }
+
   if (!showForm) {
     return (
       <button onClick={() => setShowForm(true)} className="btn-press w-full border border-line text-ink hover:border-accent font-medium text-[14px] px-5 py-2.5 rounded-[4px]">

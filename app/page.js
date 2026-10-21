@@ -197,7 +197,8 @@ export default function FeedPage() {
     async function load() {
       const { data, error } = await supabase
         .from("projects")
-        .select("*, profiles!projects_owner_id_fkey(display_name, avatar_url)")
+  .select("*, profiles!projects_owner_id_fkey(display_name, avatar_url)")
+        .or("status.eq.open,status.is.null")
         .order("created_at", { ascending: false })
         .limit(50);
       if (cancelled) return;
